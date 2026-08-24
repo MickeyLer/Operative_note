@@ -1,26 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Times+New+Roman:wght@400;700&display=swap');
 @import "tailwindcss";
 
+
 :root {
-  --background: #ffffff;
+  --background: #f3f4f6;
   --foreground: #171717;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Sarabun', sans-serif;
+  touch-action: manipulation;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* A4 Page Formatting for Print & Preview */
+.a4-page {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 15mm 15mm 12mm 15mm;
+  margin: 0 auto;
+  background: white;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  font-family: 'Times New Roman', 'Sarabun', serif;
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: #000;
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.dot-line {
+  border-bottom: 1px dotted #444;
+  display: inline-block;
+  min-width: 50px;
+  padding: 0 4px;
+  font-weight: bold;
+}
+
+/* Print CSS Strategy */
+@media print {
+  body {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .a4-page {
+    box-shadow: none !important;
+    margin: 0 !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    padding: 10mm 12mm 8mm 12mm !important;
+    page-break-after: always;
+    page-break-inside: avoid;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 0;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Mobile Custom Controls */
+.mobile-tab-btn {
+  flex: 1;
+  padding: 10px 4px;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-bottom: 3px solid transparent;
+}
+.mobile-tab-btn.active {
+  border-color: #2563eb;
+  color: #2563eb;
+  background-color: #eff6ff;
 }
