@@ -43,6 +43,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOpType, setSelectedOpType] = useState('all');
+  const [userTemplates, setUserTemplates] = useState<{ id: string; name: string }[]>([]);
 
   // Fetch notes from Supabase
   const fetchNotes = async () => {
@@ -62,10 +63,31 @@ export default function Dashboard() {
     }
   };
 
+  // Fetch user templates
+  const fetchTemplates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('operative_templates')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      setUserTemplates(data || []);
+    } catch (err) {
+      console.error('Error fetching templates:', err);
+    }
+  };
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchNotes();
+    fetchTemplates();
   }, []);
+
+  const getOpLabel = (opType: string) => {
+    if (OP_LABEL_MAP[opType]) return OP_LABEL_MAP[opType];
+    const tpl = userTemplates.find(t => t.id === opType);
+    return tpl ? tpl.name : opType;
+  };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this operative note?')) return;
@@ -142,11 +164,20 @@ export default function Dashboard() {
               onChange={e => setSelectedOpType(e.target.value)}
               className="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="all">All Procedures</option>
-              <option value="open_hepatectomy">Open Hepatectomy</option>
-              <option value="lap_hepatectomy">Laparoscopic Hepatectomy</option>
-              <option value="whipple">Whipple Operation</option>
-              <option value="lap_lar">Laparoscopic LAR</option>
-              <option value="lap_chole">Laparoscopic Cholecystectomy</option>
+              <optgroup label="Default Presets (เทมเพลตมาตรฐาน)">
+                <option value="open_hepatectomy">Open Hepatectomy</option>
+                <option value="lap_hepatectomy">Laparoscopic Hepatectomy</option>
+                <option value="whipple">Whipple Operation</option>
+                <option value="lap_lar">Laparoscopic LAR</option>
+                <option value="lap_chole">Laparoscopic Cholecystectomy</option>
+              </optgroup>
+              {userTemplates.length > 0 && (
+                <optgroup label="My Templates (เทมเพลตของฉัน)">
+                  {userTemplates.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
         </div>
@@ -181,7 +212,7 @@ export default function Dashboard() {
                   {/* Note header */}
                   <div className="flex justify-between items-start">
                     <span className="bg-blue-50 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded">
-                      {OP_LABEL_MAP[note.op_type] || note.op_type}
+                      {getOpLabel(note.op_type)}
                     </span>
                     <span className="text-xs text-gray-500 flex items-center">
                       <Calendar className="h-3.5 w-3.5 mr-1" />

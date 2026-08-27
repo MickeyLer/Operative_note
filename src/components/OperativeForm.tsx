@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { 
@@ -21,7 +21,10 @@ import {
   Plus,
   Trash2,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Maximize2,
+  Minimize2,
+  GripVertical
 } from 'lucide-react';
 
 type OpKey = 'open_hepatectomy' | 'lap_hepatectomy' | 'whipple' | 'lap_lar' | 'lap_chole';
@@ -34,6 +37,20 @@ interface OperationPreset {
   pd_size?: boolean;
   ln_options: string[];
   procedures: string[];
+  is_laparoscopic?: boolean;
+}
+
+interface UserTemplate {
+  id: string;
+  name: string;
+  title: string;
+  position: string;
+  incision: string;
+  icg_flr: boolean;
+  pd_size: boolean;
+  ln_options: string[];
+  procedures: string[];
+  is_laparoscopic: boolean;
 }
 
 const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
@@ -52,13 +69,13 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "Resection of the distal common bile duct (CBD) was performed at its intrapancreatic portion.",
       "The vascular inflow vessels were individually ligated and divided.",
       "Mobilization of the liver was completed.",
-      "Parenchymal transection was performed using the Pringle maneuver (clamping for 15 minutes, followed by a 5-minute release).",
-      "The hepatic vein was divided using a vascular stapler.",
+      "Parenchymal transection was performed using <CUSA/Thunderbeat/Harmonic/cautery> under <Pringle maneuver (clamping for 15 minutes, followed by a 5-minute release)/inflow occlusion>.",
+      "The hepatic vein was divided using a <vascular stapler/Hem-o-lok clips/ligatures>.",
       "The proximal bile duct was divided with a margin of at least 1 cm from the tumor, and ductoplasty was performed.",
-      "A Roux-en-Y hepaticojejunostomy was constructed using 5-0 PDS sutures.",
+      "A Roux-en-Y hepaticojejunostomy was constructed using <5-0 PDS/4-0 PDS/4-0 vicryl/4-0 monocryl> sutures.",
       "Hemostasis was verified and secured.",
-      "JP drains were placed in the subhepatic and right subphrenic spaces.",
-      "The abdomen was closed in layers using a PDS loop suture, and the skin was approximated with staples."
+      "JP drains were placed in the <subhepatic and right subphrenic/subhepatic/right subphrenic> spaces.",
+      "The abdomen was closed in layers using a <PDS loop/Monocryl/Prolene> suture, and the skin was approximated with <staples/nylon/subcuticular monocryl>."
     ]
   },
   lap_hepatectomy: {
@@ -72,10 +89,10 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "Diagnostic laparoscopy and thorough abdominal cavity exploration were performed.",
       "Intraoperative ultrasound was used to localize the lesion and identify key vascular landmarks.",
       "A Glissonean approach or individual hilar dissection was performed.",
-      "A laparoscopic Pringle maneuver was prepared for inflow control.",
-      "Laparoscopic parenchymal transection was carried out using CUSA, Thunderbeat, or Harmonic scalpel.",
-      "Vascular and biliary structures were controlled using Hem-o-lok clips or an Endo-GIA stapler.",
-      "The specimen was retrieved in an extraction bag (Endo-bag) via a Pfannenstiel incision.",
+      "A laparoscopic Pringle maneuver <was prepared/was not required> for inflow control.",
+      "Laparoscopic parenchymal transection was carried out using <CUSA/Thunderbeat/Harmonic scalpel>.",
+      "Vascular and biliary structures were controlled using <Hem-o-lok clips/an Endo-GIA stapler/sutures>.",
+      "The specimen was retrieved in an extraction bag (Endo-bag) via a <Pfannenstiel incision/mini-laparotomy>.",
       "Hemostasis was verified, and a drain was placed at the surgical bed.",
       "The port sites were closed in layers."
     ]
@@ -100,12 +117,12 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "The proximal jejunum was divided using a GIA stapler.",
       "Finally, the uncinate process was dissected from the SMV and PV.",
       "Hemostasis was verified and secured.",
-      "Pancreaticojejunostomy (PJ) anastomosis was constructed using the modified Blumgart technique (duct-to-mucosa) with 5-0 PDS sutures.",
-      "Hepaticojejunostomy (HJ) anastomosis was constructed using 4-0 Monocryl sutures (interrupted or continuous).",
-      "Gastrojejunostomy (GJ) and jejunojejunostomy (JJ) anastomoses were constructed using 3-0 Monocryl sutures.",
+      "Pancreaticojejunostomy (PJ) anastomosis was constructed using the modified Blumgart technique (duct-to-mucosa) with <5-0 PDS/4-0 PDS/5-0 Prolene> sutures.",
+      "Hepaticojejunostomy (HJ) anastomosis was constructed using <4-0 Monocryl/5-0 Monocryl/4-0 PDS> sutures (interrupted or continuous).",
+      "Gastrojejunostomy (GJ) and jejunojejunostomy (JJ) anastomoses were constructed using <3-0 Monocryl/4-0 Monocryl/3-0 Vicryl> sutures.",
       "A feeding jejunostomy was performed.",
-      "JP drains were placed in the subhepatic and right subphrenic spaces.",
-      "The abdomen was closed in layers using a PDS loop suture, and the skin was approximated with staples."
+      "JP drains were placed in the <subhepatic and right subphrenic/subhepatic/right subphrenic> spaces.",
+      "The abdomen was closed in layers using a <PDS loop/Prolene/Monocryl> suture, and the skin was approximated with <staples/nylon>."
     ]
   },
   lap_lar: {
@@ -118,12 +135,12 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "A thorough inspection of the abdominal and pelvic cavities was performed.",
       "The patient was placed in the Trendelenburg position with a right lateral tilt.",
       "A medial-to-lateral dissection was performed along Toldt's fascia.",
-      "High ligation of the inferior mesenteric artery (IMA) and inferior mesenteric vein (IMV) was performed using Hem-o-lok clips.",
+      "High ligation of the inferior mesenteric artery (IMA) and inferior mesenteric vein (IMV) was performed using <Hem-o-lok clips/Endo-GIA stapler/ligatures>.",
       "Mobilization of the splenic flexure was performed as needed.",
       "Total mesorectal excision (TME) was performed with preservation of the autonomic nerves.",
-      "The distal rectum was transected using a laparoscopic linear stapler.",
+      "The distal rectum was transected using a <laparoscopic linear stapler/linear cutter>.",
       "The specimen was exteriorized and resected, and the anvil was inserted into the proximal colon.",
-      "A double-stapled end-to-end colorectal anastomosis was constructed.",
+      "A double-stapled end-to-end colorectal anastomosis was constructed using a <circular stapler (29 mm)/circular stapler (25 mm)/circular stapler (33 mm)>.",
       "An air leak test was performed and was negative.",
       "A pelvic drain was placed, and the port sites and extraction wound were closed."
     ]
@@ -138,14 +155,56 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "The gallbladder was retracted superiorly over the liver.",
       "Dissection of Calot's triangle was performed to achieve the Critical View of Safety (CVS).",
       "The cystic duct and cystic artery were clearly identified.",
-      "The cystic duct was clipped (2 clips distally, 1 clip proximally) and divided.",
-      "The cystic artery was clipped and divided.",
-      "The gallbladder was dissected off the liver bed using an electrocautery hook.",
+      "The cystic duct was clipped with <Hem-o-lok clips/titanium clips> (2 clips distally, 1 clip proximally) and divided.",
+      "The cystic artery was clipped with <Hem-o-lok clips/titanium clips> and divided.",
+      "The gallbladder was dissected off the liver bed using <an electrocautery hook/Harmonic scalpel>.",
       "Hemostasis of the gallbladder fossa was verified.",
       "The gallbladder was extracted in an extraction bag (Endo-bag) via the umbilical port.",
       "The abdomen was deflated, and the port sites were closed."
     ]
   }
+};
+
+interface TextareaAutosizeProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  value: string;
+}
+
+const TextareaAutosize = ({ value, onChange, placeholder, className, disabled, ...props }: TextareaAutosizeProps) => {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const adjustHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  };
+
+  useEffect(() => {
+    adjustHeight();
+    const timer = setTimeout(adjustHeight, 50);
+    window.addEventListener('resize', adjustHeight);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', adjustHeight);
+    };
+  }, [value]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      onChange={(e) => {
+        if (onChange) onChange(e);
+        adjustHeight();
+      }}
+      placeholder={placeholder}
+      className={className}
+      disabled={disabled}
+      rows={1}
+      style={{ resize: 'none', overflowY: 'hidden' }}
+      {...props}
+    />
+  );
 };
 
 interface OperativeFormProps {
@@ -156,11 +215,43 @@ interface OperativeFormProps {
 export default function OperativeForm({ noteId, initialPrint = false }: OperativeFormProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'info' | 'checklist' | 'findings' | 'summary' | 'preview'>('info');
-  const [selectedOpKey, setSelectedOpKey] = useState<OpKey>('open_hepatectomy');
+  const [selectedOpKey, setSelectedOpKey] = useState<string>('open_hepatectomy');
   const [loading, setLoading] = useState(!!noteId);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedPortSize, setSelectedPortSize] = useState<'5mm' | '10mm' | '12mm'>('10mm');
+
+  // A4 Preview Scale States for mobile screens
+  const [scale, setScale] = useState(1);
+  const [isZoomed, setIsZoomed] = useState(false);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+
+  // User Templates State
+  const [userTemplates, setUserTemplates] = useState<UserTemplate[]>([]);
+
+  // Template Modal State
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [templateModalData, setTemplateModalData] = useState({
+    name: "",
+    title: "",
+    position: "Supine",
+    incision: "",
+    icg_flr: false,
+    pd_size: false,
+    is_laparoscopic: false,
+    ln_options_str: ""
+  });
+
+  // [P0] Unsaved changes guard
+  const [isDirty, setIsDirty] = useState(false);
+  const [confirmNavDest, setConfirmNavDest] = useState<string | null>(null);
+
+  // Toast notification state
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // [P2] Progressive disclosure - advanced findings
+  const [showAdvancedFindings, setShowAdvancedFindings] = useState(false);
 
   // Form Fields
   const [formData, setFormData] = useState({
@@ -192,6 +283,14 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     liverMetastasis: false,
     ascites: false,
     findingTextNotes: "",
+    tumorSize: "",
+    selectedSegments: [] as string[],
+    customSegment: "",
+    tumorInvasion: "No",
+    invasionDetail: "",
+    tumorMargin: "free",
+    marginSize: "",
+    customMarginDetail: "",
     
     // Summary
     ebl: "",
@@ -214,28 +313,152 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
   });
 
   // Procedure Checklist State
-  const [checklist, setChecklist] = useState<{ id: number; text: string; checked: boolean }[]>([]);
+  const [checklist, setChecklist] = useState<{ id: number; text: string; checked: boolean; templateText?: string; selections?: Record<number, string> }[]>([]);
+  const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
+  const [lastDeletedItem, setLastDeletedItem] = useState<{ item: any; index: number } | null>(null);
 
-  const syncChecklist = (opKey: OpKey) => {
-    const op = OPERATION_PRESETS[opKey];
-    if (op) {
-      setChecklist(op.procedures.map((proc, idx) => ({
+  // Drag and Drop State & Refs
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const touchDragIndexRef = useRef<number | null>(null);
+
+  // Swipe-to-Reveal Delete Action State & Refs
+  const [swipedItemId, setSwipedItemId] = useState<number | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const swipeThreshold = 40;
+
+  // Handle closing swiped item when tapping/clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement;
+      // If we clicked outside the swiped item, reset it
+      const itemEl = target.closest('[data-swipe-id]');
+      if (itemEl) {
+        const swipeId = parseInt(itemEl.getAttribute('data-swipe-id') || '', 10);
+        if (swipeId === swipedItemId) {
+          return;
+        }
+      }
+      setSwipedItemId(null);
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, [swipedItemId]);
+
+
+
+  const fetchUserTemplates = async (): Promise<UserTemplate[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('operative_templates')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      const templates = data || [];
+      setUserTemplates(templates);
+      return templates;
+    } catch (err) {
+      console.error('Error fetching user templates:', err);
+      return [];
+    }
+  };
+
+  const getPreset = (key: string, templatesList: UserTemplate[] = userTemplates) => {
+    if (OPERATION_PRESETS[key as OpKey]) {
+      return {
+        ...OPERATION_PRESETS[key as OpKey],
+        is_laparoscopic: key.startsWith('lap_')
+      };
+    }
+    const userTpl = templatesList.find(t => t.id === key);
+    if (userTpl) {
+      return {
+        title: userTpl.title,
+        position: userTpl.position,
+        incision: userTpl.incision,
+        icg_flr: userTpl.icg_flr,
+        pd_size: userTpl.pd_size,
+        ln_options: userTpl.ln_options || [],
+        procedures: userTpl.procedures || [],
+        is_laparoscopic: userTpl.is_laparoscopic
+      };
+    }
+    return undefined;
+  };
+
+  const syncChecklist = (opKey: string, templatesList: UserTemplate[] = userTemplates) => {
+    const preset = OPERATION_PRESETS[opKey as OpKey];
+    if (preset) {
+      setChecklist(preset.procedures.map((proc, idx) => ({
         id: idx,
         text: proc,
-        checked: true
+        templateText: proc,
+        checked: true,
+        selections: {}
+      })));
+      return;
+    }
+    const userTpl = templatesList.find(t => t.id === opKey);
+    if (userTpl) {
+      setChecklist(userTpl.procedures.map((proc, idx) => ({
+        id: idx,
+        text: proc,
+        templateText: proc,
+        checked: true,
+        selections: {}
       })));
     }
   };
 
-  // Fetch note if noteId is provided
-  useEffect(() => {
-    if (!noteId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      syncChecklist('open_hepatectomy');
-      return;
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
     }
+    setToast({ message, type });
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 4000);
+  }, []);
 
-    const fetchNote = async () => {
+  // Warning before unload (browser level)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = 'คุณมีงานที่ยังไม่ได้บันทึก ต้องการออกจากหน้านี้หรือไม่?';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty]);
+
+  const handleBackToDashboard = () => {
+    if (isDirty) {
+      setConfirmNavDest('/');
+    } else {
+      router.push('/');
+    }
+  };
+
+  // Fetch note & templates on load
+  useEffect(() => {
+    const loadData = async () => {
+      // 1. Fetch user templates first
+      const templatesList = await fetchUserTemplates();
+
+      if (!noteId) {
+        syncChecklist('open_hepatectomy', templatesList);
+        setLoading(false);
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from('operative_notes')
@@ -245,7 +468,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
         if (error) throw error;
         if (data) {
-          const opKey = data.op_type as OpKey;
+          const opKey = data.op_type;
           setSelectedOpKey(opKey);
           
           setFormData({
@@ -277,6 +500,14 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
             liverMetastasis: !!data.findings.liverMetastasis,
             ascites: !!data.findings.ascites,
             findingTextNotes: data.findings.findingTextNotes || '',
+            tumorSize: data.findings.tumorSize || '',
+            selectedSegments: data.findings.selectedSegments || [],
+            customSegment: data.findings.customSegment || '',
+            tumorInvasion: data.findings.tumorInvasion || 'No',
+            invasionDetail: data.findings.invasionDetail || '',
+            tumorMargin: data.findings.tumorMargin || 'free',
+            marginSize: data.findings.marginSize || '',
+            customMarginDetail: data.findings.customMarginDetail || '',
             
             // Summary
             ebl: data.ebl,
@@ -312,28 +543,161 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       }
     };
 
-    fetchNote();
+    loadData();
   }, [noteId, initialPrint]);
 
 
   // Switch Operation type & sync default details
-  const handleOpChange = (key: OpKey) => {
+  const handleOpChange = (key: string, templatesList: UserTemplate[] = userTemplates) => {
     setSelectedOpKey(key);
-    syncChecklist(key);
+    syncChecklist(key, templatesList);
     
     // Sync default metadata / procedures
-    const preset = OPERATION_PRESETS[key];
-    setFormData(prev => ({
-      ...prev,
-      operativeProcedure: preset.title,
-      // Clear fields not relevant to operation
-      icgR15: "",
-      flr: "",
-      pdSize: "",
-      pancreaticConsistency: "",
-      selectedLN: [],
-      ports: []
-    }));
+    const preset = getPreset(key, templatesList);
+    if (preset) {
+      setFormData(prev => ({
+        ...prev,
+        operativeProcedure: preset.title,
+        // Clear fields not relevant to operation
+        icgR15: "",
+        flr: "",
+        pdSize: "",
+        pancreaticConsistency: "",
+        selectedLN: [],
+        ports: [],
+        tumorSize: "",
+        selectedSegments: [],
+        customSegment: "",
+        tumorInvasion: "No",
+        invasionDetail: "",
+        tumorMargin: "free",
+        marginSize: "",
+        customMarginDetail: ""
+      }));
+    }
+  };
+
+  // Template CRUD Handlers
+  const openSaveTemplateModal = () => {
+    const preset = getPreset(selectedOpKey);
+    setTemplateModalData({
+      name: `Clone of ${preset?.title || 'Procedure'}`,
+      title: formData.operativeProcedure || preset?.title || "",
+      position: preset?.position || "Supine",
+      incision: preset?.incision || "",
+      icg_flr: !!preset?.icg_flr,
+      pd_size: !!preset?.pd_size,
+      is_laparoscopic: !!preset?.is_laparoscopic,
+      ln_options_str: preset?.ln_options.join(", ") || ""
+    });
+    setIsTemplateModalOpen(true);
+  };
+
+  const handleSaveNewTemplate = async () => {
+    if (!templateModalData.name.trim()) {
+      alert("Please enter a Template Name.");
+      return;
+    }
+    if (!templateModalData.title.trim()) {
+      alert("Please enter a Procedure Title.");
+      return;
+    }
+
+    const ln_options = templateModalData.ln_options_str
+      .split(",")
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    // Save current steps in checklist
+    const procedures = checklist.map(c => c.text);
+
+    try {
+      const { data, error } = await supabase
+        .from('operative_templates')
+        .insert({
+          name: templateModalData.name,
+          title: templateModalData.title,
+          position: templateModalData.position,
+          incision: templateModalData.incision,
+          icg_flr: templateModalData.icg_flr,
+          pd_size: templateModalData.pd_size,
+          is_laparoscopic: templateModalData.is_laparoscopic,
+          ln_options: ln_options,
+          procedures: procedures
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      alert(`Template "${templateModalData.name}" saved successfully!`);
+      setIsTemplateModalOpen(false);
+
+      // Refresh template list
+      const updatedTemplates = await fetchUserTemplates();
+      
+      // Select the new template
+      if (data && data.id) {
+        setSelectedOpKey(data.id);
+      }
+    } catch (err) {
+      console.error("Error saving new template:", err);
+      alert("Failed to save template. Check console for details.");
+    }
+  };
+
+  const handleUpdateTemplate = async () => {
+    const isUserTpl = !['open_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole'].includes(selectedOpKey);
+    if (!isUserTpl) return;
+
+    if (!confirm("Are you sure you want to update this template with current form steps and procedure name?")) return;
+
+    const procedures = checklist.map(c => c.text);
+
+    try {
+      const { error } = await supabase
+        .from('operative_templates')
+        .update({
+          title: formData.operativeProcedure,
+          procedures: procedures
+        })
+        .eq('id', selectedOpKey);
+
+      if (error) throw error;
+
+      alert("Template updated successfully!");
+      await fetchUserTemplates();
+    } catch (err) {
+      console.error("Error updating template:", err);
+      alert("Failed to update template.");
+    }
+  };
+
+  const handleDeleteTemplate = async () => {
+    const isUserTpl = !['open_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole'].includes(selectedOpKey);
+    if (!isUserTpl) return;
+
+    if (!confirm("Are you sure you want to delete this template? Operative notes using this template will not be affected.")) return;
+
+    try {
+      const { error } = await supabase
+        .from('operative_templates')
+        .delete()
+        .eq('id', selectedOpKey);
+
+      if (error) throw error;
+
+      alert("Template deleted successfully.");
+      
+      // Refresh templates
+      const updatedList = await fetchUserTemplates();
+      
+      // Reset to default preset
+      handleOpChange('open_hepatectomy', updatedList);
+    } catch (err) {
+      console.error("Error deleting template:", err);
+      alert("Failed to delete template.");
+    }
   };
 
   // Photo Uploader to Supabase Storage
@@ -377,7 +741,31 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     }
   };
 
-  const removePhoto = (index: number) => {
+  const removePhoto = async (index: number) => {
+    const photoUrl = formData.photos[index];
+    if (!photoUrl) return;
+
+    try {
+      // Extract filename from public URL (e.g. from the last path segment before any query params)
+      // Standard public URL format: https://[project-id].supabase.co/storage/v1/object/public/operative-photos/filename.jpg
+      const urlWithoutParams = photoUrl.split('?')[0];
+      const fileName = urlWithoutParams.substring(urlWithoutParams.lastIndexOf('/') + 1);
+
+      if (fileName) {
+        const { error } = await supabase.storage
+          .from('operative-photos')
+          .remove([fileName]);
+        
+        if (error) {
+          console.error('Error deleting photo from Supabase storage:', error);
+        } else {
+          console.log(`Successfully deleted ${fileName} from Supabase storage`);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to delete photo from storage:', err);
+    }
+
     setFormData(prev => ({
       ...prev,
       photos: prev.photos.filter((_, i) => i !== index)
@@ -414,13 +802,86 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       {
         id: prev.length > 0 ? Math.max(...prev.map(i => i.id)) + 1 : 0,
         text: "New surgical step...",
-        checked: true
+        templateText: "New surgical step...",
+        checked: true,
+        selections: {}
       }
     ]);
   };
 
   const deleteChecklistItem = (id: number) => {
-    setChecklist(prev => prev.filter(item => item.id !== id));
+    const item = checklist.find(i => i.id === id);
+    if (!item) return;
+    const idx = checklist.findIndex(i => i.id === id);
+    if (idx !== -1) {
+      setLastDeletedItem({ item, index: idx });
+      setChecklist(prev => prev.filter(i => i.id !== id));
+      showToast('ลบขั้นตอนผ่าตัดแล้ว', 'info');
+    }
+  };
+
+  const undoDeleteChecklistItem = () => {
+    if (lastDeletedItem) {
+      setChecklist(prev => {
+        const newList = [...prev];
+        newList.splice(lastDeletedItem.index, 0, lastDeletedItem.item);
+        return newList;
+      });
+      setLastDeletedItem(null);
+      showToast('คืนค่าขั้นตอนผ่าตัดเรียบร้อยแล้ว', 'success');
+    }
+  };
+
+  const getPlaceholders = (text: string) => {
+    const regex = /<([^>]+)>/g;
+    const matches = [];
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      matches.push({
+        full: match[0],
+        content: match[1],
+        index: match.index
+      });
+    }
+    return matches;
+  };
+
+  const selectOption = (itemId: number, placeholderIndex: number, optionValue: string) => {
+    setChecklist(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      
+      const tplText = item.templateText || item.text;
+      const placeholders = getPlaceholders(tplText);
+      if (placeholders.length === 0) return item;
+      
+      const newSelections = { ...(item.selections || {}), [placeholderIndex]: optionValue };
+      
+      let index = 0;
+      const newText = tplText.replace(/<([^>]+)>/g, (match: string) => {
+        const val = newSelections[index] !== undefined ? newSelections[index] : match;
+        index++;
+        return val;
+      });
+      
+      return {
+        ...item,
+        text: newText,
+        selections: newSelections,
+        templateText: tplText
+      };
+    }));
+  };
+
+  const isChecklistValid = checklist
+    .filter(item => item.checked)
+    .every(item => !item.text.includes('<') && !item.text.includes('>'));
+
+  const handleTabClick = (tab: 'info' | 'checklist' | 'findings' | 'summary' | 'preview') => {
+    if (tab !== 'info' && tab !== 'checklist' && !isChecklistValid) {
+      alert('กรุณาเลือกตัวเลือกในขั้นตอนผ่าตัด (เช่น ชนิดของไหม หรือเครื่องมือ) ให้ครบถ้วนก่อนข้ามไปขั้นตอนถัดไป');
+      return;
+    }
+    setActiveTab(tab);
   };
 
   const moveChecklistItem = (index: number, direction: 'up' | 'down') => {
@@ -435,6 +896,106 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       }
       return newList;
     });
+  };
+
+  // Desktop Drag and Drop Handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', index.toString());
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    setChecklist(prev => {
+      const newList = [...prev];
+      const item = newList[draggedIndex];
+      newList.splice(draggedIndex, 1);
+      newList.splice(index, 0, item);
+      return newList;
+    });
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
+  // Mobile Touch Drag Handlers (Reordering)
+  const handleTouchDragStart = (e: React.TouchEvent, index: number) => {
+    touchDragIndexRef.current = index;
+    setDraggedIndex(index);
+  };
+
+  const handleTouchDragMove = (e: React.TouchEvent, index: number) => {
+    if (touchDragIndexRef.current === null) return;
+    const touch = e.touches[0];
+    const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!targetElement) return;
+
+    const itemEl = targetElement.closest('[data-index]');
+    if (itemEl) {
+      const targetIndex = parseInt(itemEl.getAttribute('data-index') || '', 10);
+      const currentIndex = touchDragIndexRef.current;
+
+      if (!isNaN(targetIndex) && targetIndex !== currentIndex) {
+        setChecklist(prev => {
+          const newList = [...prev];
+          const item = newList[currentIndex];
+          newList.splice(currentIndex, 1);
+          newList.splice(targetIndex, 0, item);
+          return newList;
+        });
+        touchDragIndexRef.current = targetIndex;
+        setDraggedIndex(targetIndex);
+      }
+    }
+  };
+
+  const handleTouchDragEnd = () => {
+    touchDragIndexRef.current = null;
+    setDraggedIndex(null);
+  };
+
+  // Mobile Touch Swipe Handlers (Swipe-to-Delete)
+  const handleTouchStart = (e: React.TouchEvent, itemId: number) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent, itemId: number) => {
+    if (!touchStartRef.current) return;
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - touchStartRef.current.x;
+    const deltaY = touch.clientY - touchStartRef.current.y;
+
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent, itemId: number) => {
+    if (!touchStartRef.current) return;
+    const touch = e.changedTouches[0];
+    const deltaX = touch.clientX - touchStartRef.current.x;
+    const deltaY = touch.clientY - touchStartRef.current.y;
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (deltaX < -swipeThreshold) {
+        setSwipedItemId(itemId);
+      } else if (deltaX > swipeThreshold) {
+        if (swipedItemId === itemId) {
+          setSwipedItemId(null);
+        }
+      }
+    }
+    touchStartRef.current = null;
   };
 
   const handleAbdomenClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -495,7 +1056,15 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           liverMetastasis: formData.liverMetastasis,
           ascites: formData.ascites,
           findingTextNotes: formData.findingTextNotes,
-          ports: formData.ports || []
+          ports: formData.ports || [],
+          tumorSize: formData.tumorSize,
+          selectedSegments: formData.selectedSegments,
+          customSegment: formData.customSegment,
+          tumorInvasion: formData.tumorInvasion,
+          invasionDetail: formData.invasionDetail,
+          tumorMargin: formData.tumorMargin,
+          marginSize: formData.marginSize,
+          customMarginDetail: formData.customMarginDetail
         },
         checklist: checklist,
         ebl: formData.ebl,
@@ -547,8 +1116,18 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     );
   }
 
-  const currentPreset = OPERATION_PRESETS[selectedOpKey];
-  const isLaparoscopic = selectedOpKey.startsWith('lap_');
+  const activePreset = getPreset(selectedOpKey);
+  const currentPreset = activePreset || {
+    title: formData.operativeProcedure || "",
+    position: "Supine",
+    incision: "",
+    icg_flr: false,
+    pd_size: false,
+    ln_options: [] as string[],
+    procedures: [] as string[],
+    is_laparoscopic: false
+  };
+  const isLaparoscopic = selectedOpKey.startsWith('lap_') || !!currentPreset.is_laparoscopic;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
@@ -556,8 +1135,8 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       {/* Top sticky app header (Hidden when printing) */}
       <header className="bg-blue-800 text-white px-4 py-3 shadow-md flex justify-between items-center no-print sticky top-0 z-50">
         <button 
-          onClick={() => router.push('/')} 
-          className="flex items-center space-x-1 hover:text-blue-200 transition text-sm">
+          onClick={handleBackToDashboard} 
+          className="flex items-center space-x-1 hover:text-blue-200 transition text-sm cursor-pointer no-toggle">
           <ArrowLeft className="h-4 w-4" />
           <span className="hidden sm:inline font-semibold">Dashboard</span>
         </button>
@@ -596,27 +1175,27 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       <div className="bg-white border-b border-gray-200 flex no-print sticky top-[48px] z-40 shadow-sm text-xs font-bold overflow-x-auto">
         <button 
           className={`mobile-tab-btn flex-shrink-0 ${activeTab === 'info' ? 'active' : 'text-gray-600'}`}
-          onClick={() => setActiveTab('info')}>
+          onClick={() => handleTabClick('info')}>
           1. Patient & Team
         </button>
         <button 
           className={`mobile-tab-btn flex-shrink-0 ${activeTab === 'checklist' ? 'active' : 'text-gray-600'}`}
-          onClick={() => setActiveTab('checklist')}>
+          onClick={() => handleTabClick('checklist')}>
           2. Operation & Steps
         </button>
         <button 
           className={`mobile-tab-btn flex-shrink-0 ${activeTab === 'findings' ? 'active' : 'text-gray-600'}`}
-          onClick={() => setActiveTab('findings')}>
+          onClick={() => handleTabClick('findings')}>
           3. Findings & Photos
         </button>
         <button 
           className={`mobile-tab-btn flex-shrink-0 ${activeTab === 'summary' ? 'active' : 'text-gray-600'}`}
-          onClick={() => setActiveTab('summary')}>
+          onClick={() => handleTabClick('summary')}>
           4. Summary
         </button>
         <button 
           className={`mobile-tab-btn flex-shrink-0 ${activeTab === 'preview' ? 'active' : 'text-gray-600'}`}
-          onClick={() => setActiveTab('preview')}>
+          onClick={() => handleTabClick('preview')}>
           5. A4 Print Preview
         </button>
       </div>
@@ -814,7 +1393,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
               <div className="flex justify-end pt-2">
                 <button 
-                  onClick={() => setActiveTab('checklist')}
+                  onClick={() => handleTabClick('checklist')}
                   className="bg-blue-600 text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow hover:bg-blue-700 transition w-full sm:w-auto">
                   <span>Next: Operation Type</span>
                   <ChevronRight className="h-4 w-4" />
@@ -834,14 +1413,55 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                 </label>
                 <select 
                   value={selectedOpKey} 
-                  onChange={(e) => handleOpChange(e.target.value as OpKey)}
+                  onChange={(e) => handleOpChange(e.target.value)}
                   className="w-full bg-blue-50 border border-blue-300 text-blue-900 font-semibold rounded-lg p-3 text-base focus:ring-2 focus:ring-blue-500">
-                  <option value="open_hepatectomy">Open Hepatectomy</option>
-                  <option value="lap_hepatectomy">Laparoscopic Hepatectomy</option>
-                  <option value="whipple">Whipple Operation</option>
-                  <option value="lap_lar">Laparoscopic LAR with anastomosis</option>
-                  <option value="lap_chole">Laparoscopic Cholecystectomy</option>
+                  <optgroup label="Default Presets (เทมเพลตมาตรฐาน)">
+                    <option value="open_hepatectomy">Open Hepatectomy</option>
+                    <option value="lap_hepatectomy">Laparoscopic Hepatectomy</option>
+                    <option value="whipple">Whipple Operation</option>
+                    <option value="lap_lar">Laparoscopic LAR with anastomosis</option>
+                    <option value="lap_chole">Laparoscopic Cholecystectomy</option>
+                  </optgroup>
+                  {userTemplates.length > 0 && (
+                    <optgroup label="My Templates (เทมเพลตของฉัน)">
+                      {userTemplates.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={openSaveTemplateModal}
+                    className="bg-green-600 hover:bg-green-750 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm flex items-center space-x-1.5 transition cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Save as New Template (บันทึกเป็นเทมเพลตใหม่)</span>
+                  </button>
+
+                  {!['open_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole'].includes(selectedOpKey) && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleUpdateTemplate}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm flex items-center space-x-1.5 transition cursor-pointer"
+                      >
+                        <Save className="h-3.5 w-3.5" />
+                        <span>Update Selected Template (อัปเดตเทมเพลตนี้)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDeleteTemplate}
+                        className="bg-red-600 hover:bg-red-750 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm flex items-center space-x-1.5 transition cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Delete Selected Template (ลบเทมเพลตนี้)</span>
+                      </button>
+                    </>
+                  )}
+                </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Operative Procedure Name (for template)</label>
@@ -865,59 +1485,182 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     {checklist.filter(c => c.checked).length}/{checklist.length} Steps
                   </span>
                 </div>
-                <div className="space-y-2 max-h-[450px] overflow-y-auto pr-1">
-                  {checklist.map((item, index) => (
-                    <div 
-                      key={item.id} 
-                      className="flex items-center space-x-3 p-2 rounded-lg border border-gray-250 bg-white hover:bg-blue-50/40 transition">
-                      <input 
-                        type="checkbox" 
-                        checked={item.checked} 
-                        onChange={() => toggleChecklist(item.id)}
-                        className="h-4.5 w-4.5 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer shrink-0"
-                      />
-                      
-                      {/* Move Up / Down Buttons */}
-                      <div className="flex flex-col shrink-0">
-                        <button
-                          type="button"
-                          disabled={index === 0}
-                          onClick={() => moveChecklistItem(index, 'up')}
-                          className="text-gray-400 hover:text-blue-600 disabled:text-gray-200 transition p-0.5"
-                          title="Move step up"
-                        >
-                          <ArrowUp className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={index === checklist.length - 1}
-                          onClick={() => moveChecklistItem(index, 'down')}
-                          className="text-gray-400 hover:text-blue-600 disabled:text-gray-200 transition p-0.5"
-                          title="Move step down"
-                        >
-                          <ArrowDown className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                
+                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                  {checklist.map((item, index) => {
+                    const placeholders = getPlaceholders(item.templateText || item.text);
+                    const isExpanded = expandedItemId === item.id;
+                    const hasUnresolvedPlaceholders = item.checked && (item.text.includes('<') || item.text.includes('>'));
 
-                      <input
-                        type="text"
-                        value={item.text}
-                        onChange={(e) => handleTextChange(item.id, e.target.value)}
-                        placeholder="Describe the surgical step..."
-                        className={`flex-1 bg-transparent border-0 border-b border-dashed border-gray-205 hover:border-gray-400 focus:border-blue-500 focus:ring-0 p-1 text-xs focus:bg-blue-50/30 rounded transition ${
-                          item.checked ? 'text-gray-900 font-medium' : 'text-gray-400 line-through'
+                    return (
+                      <div 
+                        key={item.id} 
+                        data-index={index}
+                        data-swipe-id={item.id}
+                        className={`group relative overflow-hidden rounded-lg border transition-all ${
+                          draggedIndex === index 
+                            ? 'opacity-50 border-blue-500 bg-blue-50/20' 
+                            : isExpanded
+                              ? 'border-blue-300 bg-blue-50/10 shadow-sm'
+                              : 'border-gray-250 bg-gray-50 hover:border-gray-300'
                         }`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => deleteChecklistItem(item.id)}
-                        className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-gray-100 transition shrink-0"
-                        title="Delete step"
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDrop={(e) => e.preventDefault()}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                        {/* Swipe Action Background (Delete Button - revealed on swipe left on mobile) */}
+                        <div className="absolute right-0 top-0 bottom-0 flex items-center justify-end z-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              deleteChecklistItem(item.id);
+                              setSwipedItemId(null);
+                            }}
+                            className="bg-red-600 hover:bg-red-700 text-white h-full px-5 flex items-center space-x-1.5 font-bold text-xs select-none cursor-pointer transition-colors"
+                            title="Delete step"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span>ลบ (Delete)</span>
+                          </button>
+                        </div>
+
+                        {/* Foreground Row Content */}
+                        <div
+                          className="relative z-10 bg-white flex flex-col p-3 transition-transform duration-200 ease-out"
+                          style={{
+                            transform: swipedItemId === item.id ? 'translateX(-110px)' : 'translateX(0)',
+                            touchAction: 'pan-y'
+                          }}
+                          onTouchStart={(e) => handleTouchStart(e, item.id)}
+                          onTouchMove={(e) => handleTouchMove(e, item.id)}
+                          onTouchEnd={(e) => handleTouchEnd(e, item.id)}
+                        >
+                          <div 
+                            className="flex items-start space-x-2.5 cursor-pointer"
+                            onClick={(e) => {
+                              // If they clicked a control (checkbox, buttons, inputs, drag handle), don't toggle expansion
+                              const target = e.target as HTMLElement;
+                              if (target.closest('.no-toggle')) return;
+                              setExpandedItemId(isExpanded ? null : item.id);
+                            }}
+                          >
+                            {/* Drag Handle (for Desktop & Mobile drag-and-drop) */}
+                            <div
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, index)}
+                              onDragEnd={handleDragEnd}
+                              onTouchStart={(e) => handleTouchDragStart(e, index)}
+                              onTouchMove={(e) => handleTouchDragMove(e, index)}
+                              onTouchEnd={handleTouchDragEnd}
+                              className="no-toggle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing p-1 shrink-0 select-none touch-none mt-0.5"
+                              title="Drag to reorder"
+                            >
+                              <GripVertical className="h-4 w-4" />
+                            </div>
+
+                            {/* Checkbox */}
+                            <input 
+                              type="checkbox" 
+                              checked={item.checked} 
+                              onChange={() => toggleChecklist(item.id)}
+                              className="no-toggle h-4.5 w-4.5 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer shrink-0 mt-0.5"
+                            />
+
+                            {/* Wrapping and Auto-resizing Textarea */}
+                            <div className="flex-1 min-w-0">
+                              <TextareaAutosize
+                                value={item.text}
+                                onChange={(e) => handleTextChange(item.id, e.target.value)}
+                                placeholder="Describe the surgical step..."
+                                className={`no-toggle w-full bg-transparent border-0 border-b border-dashed border-gray-205 hover:border-gray-400 focus:border-blue-500 focus:ring-0 p-1 text-xs focus:bg-blue-50/30 rounded transition leading-relaxed min-h-[1.75rem] break-words break-all whitespace-pre-wrap ${
+                                  item.checked ? 'text-gray-900 font-medium' : 'text-gray-400 line-through'
+                                }`}
+                              />
+
+                              {/* Warnings when collapsed */}
+                              {!isExpanded && hasUnresolvedPlaceholders && (
+                                <div className="mt-1 pl-1">
+                                  <span className="bg-red-50 text-red-700 text-[10px] px-2 py-0.5 rounded font-bold border border-red-150 animate-pulse inline-flex items-center">
+                                    ⚠️ มีตัวเลือกที่ยังไม่ได้ระบุ (คลิกที่นี่)
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Desktop-only delete button (hidden on mobile, reveals on hover on desktop) */}
+                            <button
+                              type="button"
+                              onClick={() => deleteChecklistItem(item.id)}
+                              className="no-toggle text-gray-400 hover:text-red-500 p-1.5 rounded hover:bg-gray-100 transition shrink-0 hidden md:block md:opacity-0 group-hover:opacity-100 duration-150"
+                              title="Delete step"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          {/* Expanded Options Panel */}
+                          {isExpanded && item.checked && placeholders.length > 0 && (
+                            <div className="no-toggle mt-3 pt-3 border-t border-gray-100 space-y-3 text-xs bg-gray-50/50 p-2.5 rounded-lg">
+                              {placeholders.map((ph, phIdx) => {
+                                const options = ph.content.split(/[\/|]/).map(o => o.trim());
+                                const selectedValue = item.selections?.[phIdx];
+                                const isCustomSelected = selectedValue !== undefined && selectedValue !== '' && !options.includes(selectedValue) && selectedValue !== 'Custom...';
+
+                                return (
+                                  <div key={phIdx} className="space-y-1.5 border-b border-gray-100 pb-2.5 last:border-0 last:pb-0">
+                                    <div className="text-[11px] font-bold text-gray-700 flex items-center">
+                                      <span className="bg-blue-100 text-blue-800 text-[10px] w-4.5 h-4.5 rounded-full inline-flex items-center justify-center mr-1.5 font-bold shrink-0">
+                                        {phIdx + 1}
+                                      </span>
+                                      <span>เลือกตัวเลือก (Select option):</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {options.map(opt => {
+                                        const isSelected = selectedValue === opt;
+                                        return (
+                                          <button
+                                            key={opt}
+                                            type="button"
+                                            onClick={() => selectOption(item.id, phIdx, opt)}
+                                            className={`px-2.5 py-1 rounded border text-[11px] font-semibold transition-all cursor-pointer ${
+                                              isSelected 
+                                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                                                : 'bg-white text-gray-700 border-gray-250 hover:bg-gray-100'
+                                            }`}
+                                          >
+                                            {opt}
+                                          </button>
+                                        );
+                                      })}
+                                      <button
+                                        type="button"
+                                        onClick={() => selectOption(item.id, phIdx, isCustomSelected ? '' : 'Custom...')}
+                                        className={`px-2.5 py-1 rounded border text-[11px] font-semibold transition-all cursor-pointer ${
+                                          isCustomSelected || selectedValue === 'Custom...'
+                                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                                            : 'bg-white text-gray-700 border-gray-250 hover:bg-gray-100'
+                                        }`}
+                                      >
+                                        {isCustomSelected || selectedValue === 'Custom...' ? 'ระบุเอง (Custom)' : '✏️ อื่นๆ...'}
+                                      </button>
+                                    </div>
+                                    {(isCustomSelected || selectedValue === 'Custom...') && (
+                                      <input
+                                        type="text"
+                                        value={selectedValue === 'Custom...' ? '' : selectedValue}
+                                        onChange={(e) => selectOption(item.id, phIdx, e.target.value)}
+                                        placeholder="พิมพ์ระบุข้อความที่ต้องการ..."
+                                        className="w-full bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                      />
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="flex justify-between items-center pt-2">
@@ -930,106 +1673,31 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     <span>Add Custom Step (เพิ่มขั้นตอนผ่าตัด)</span>
                   </button>
                 </div>
-
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 space-y-2">
-                  <h3 className="font-bold text-gray-700 text-xs flex items-center">
-                    <Info className="h-3.5 w-3.5 text-blue-600 mr-1.5 shrink-0" />
-                    Surgical Reference Cheat Sheet (คีย์เวิร์ด/ตัวเลือกแนะนำด่วน)
-                  </h3>
-                  <p className="text-[11px] text-gray-500 leading-normal">
-                    คลิกแก้ข้อความในกล่องข้อความขั้นตอนผ่าตัดด้านบนได้โดยตรง หรือกดปุ่มด้านล่างนี้เพื่อคัดลอกคำแนะนำลงคลิปบอร์ดเพื่อนำไปกดวาง (Paste) ในขั้นตอนที่ต้องการ:
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1 text-[11px] text-gray-600 font-mono">
-                    <div className="bg-white p-2 rounded-lg border border-gray-150">
-                      <span className="font-bold text-blue-800">Sutures (ไหมเย็บ):</span>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {["5-0 PDS", "4-0 PDS", "3-0 PDS", "4-0 Monocryl", "3-0 Monocryl", "3-0 Silk", "PDS loop"].map(s => (
-                          <button
-                            key={s}
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(s);
-                              alert(`Copied "${s}" to clipboard! You can paste it into any step.`);
-                            }}
-                            className="bg-gray-100 hover:bg-blue-100 text-gray-800 hover:text-blue-900 px-1.5 py-0.5 rounded text-[10px] transition"
-                            title="Click to copy to clipboard"
-                          >
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="bg-white p-2 rounded-lg border border-gray-150">
-                      <span className="font-bold text-blue-800">Devices (เครื่องมือ):</span>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {["CUSA", "Thunderbeat", "Harmonic", "Ligasure", "Electrocautery hook", "Endo-GIA"].map(d => (
-                          <button
-                            key={d}
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(d);
-                              alert(`Copied "${d}" to clipboard! You can paste it into any step.`);
-                            }}
-                            className="bg-gray-100 hover:bg-blue-100 text-gray-800 hover:text-blue-900 px-1.5 py-0.5 rounded text-[10px] transition"
-                            title="Click to copy to clipboard"
-                          >
-                            {d}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="bg-white p-2 rounded-lg border border-gray-150">
-                      <span className="font-bold text-blue-800">Incision (แนวแผล):</span>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {["Pfannenstiel incision", "Mini-laparotomy", "Midline incision", "Mirror-L incision"].map(i => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(i);
-                              alert(`Copied "${i}" to clipboard! You can paste it into any step.`);
-                            }}
-                            className="bg-gray-100 hover:bg-blue-100 text-gray-800 hover:text-blue-900 px-1.5 py-0.5 rounded text-[10px] transition"
-                            title="Click to copy to clipboard"
-                          >
-                            {i}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="bg-white p-2 rounded-lg border border-gray-150">
-                      <span className="font-bold text-blue-800">Pneumoperitoneum:</span>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {["Veress needle", "Hasson technique"].map(e => (
-                          <button
-                            key={e}
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(e);
-                              alert(`Copied "${e}" to clipboard! You can paste it into any step.`);
-                            }}
-                            className="bg-gray-100 hover:bg-blue-100 text-gray-800 hover:text-blue-900 px-1.5 py-0.5 rounded text-[10px] transition"
-                            title="Click to copy to clipboard"
-                          >
-                            {e}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
+
+              {/* Validation Warning Message Box */}
+              {!isChecklistValid && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-xs font-semibold flex items-center space-x-2 animate-pulse no-print">
+                  <span>⚠️ กรุณาเลือกตัวเลือก (เช่น ชนิดไหมเย็บ หรือเครื่องมือแพทย์) สำหรับขั้นตอนที่ยังมีเครื่องหมายคำเตือนให้ครบถ้วนก่อนไปต่อ</span>
+                </div>
+              )}
 
               <div className="flex justify-between pt-2 gap-3">
                 <button 
-                  onClick={() => setActiveTab('info')}
+                  onClick={() => handleTabClick('info')}
                   className="bg-gray-200 text-gray-700 font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow hover:bg-gray-300 transition w-full sm:w-auto">
                   <ChevronLeft className="h-4 w-4" />
                   <span>Back</span>
                 </button>
                 <button 
-                  onClick={() => setActiveTab('findings')}
-                  className="bg-blue-600 text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow hover:bg-blue-700 transition w-full sm:w-auto">
+                  disabled={!isChecklistValid}
+                  onClick={() => handleTabClick('findings')}
+                  className={`font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow transition w-full sm:w-auto ${
+                    isChecklistValid 
+                      ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer shadow' 
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
+                  }`}
+                >
                   <span>Next: Findings</span>
                   <ChevronRight className="h-4 w-4" />
                 </button>
@@ -1048,26 +1716,203 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
                 {/* Operation Specific parameters */}
                 {currentPreset.icg_flr && (
-                  <div className="grid grid-cols-2 gap-3 bg-blue-50/55 p-3 rounded-lg text-sm border border-blue-100">
-                    <div>
-                      <label className="block text-xs font-semibold text-blue-800 mb-1">ICG R-15</label>
-                      <input 
-                        type="text" 
-                        value={formData.icgR15} 
-                        onChange={e => setFormData({...formData, icgR15: e.target.value})} 
-                        className="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                  <>
+                    <div className="grid grid-cols-2 gap-3 bg-blue-50/55 p-3 rounded-lg text-sm border border-blue-100">
+                      <div>
+                        <label className="block text-xs font-semibold text-blue-800 mb-1">ICG R-15</label>
+                        <input 
+                          type="text" 
+                          value={formData.icgR15} 
+                          onChange={e => setFormData({...formData, icgR15: e.target.value})} 
+                          className="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-blue-800 mb-1">FLR (Future Liver Remnant)</label>
+                        <input 
+                          type="text" 
+                          value={formData.flr} 
+                          onChange={e => setFormData({...formData, flr: e.target.value})} 
+                          className="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-blue-800 mb-1">FLR (Future Liver Remnant)</label>
-                      <input 
-                        type="text" 
-                        value={formData.flr} 
-                        onChange={e => setFormData({...formData, flr: e.target.value})} 
-                        className="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+
+                    <div className="border border-blue-100 rounded-xl p-4 bg-blue-50/20 space-y-4">
+                      <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wider border-b pb-1.5 border-blue-200 flex items-center">
+                        <Activity className="h-4 w-4 text-blue-600 mr-1.5" />
+                        Tumor Findings (สิ่งตรวจพบเนื้องอก)
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Tumor Size */}
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">Tumor Size (cm):</label>
+                          <div className="flex items-center space-x-2">
+                            <input 
+                              type="text" 
+                              placeholder="e.g., 5 or 3x4"
+                              value={formData.tumorSize}
+                              onChange={e => setFormData({...formData, tumorSize: e.target.value})}
+                              className="w-full border border-gray-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium"
+                            />
+                            <span className="text-xs font-bold text-gray-500">cm</span>
+                          </div>
+                        </div>
+
+                        {/* Margin */}
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">Surgical Margin:</label>
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {[
+                              { label: 'Free margin', value: 'free' },
+                              { label: 'Positive margin', value: 'positive' },
+                              { label: 'Close margin', value: 'close' },
+                              { label: 'Custom', value: 'custom' }
+                            ].map(opt => (
+                              <label key={opt.value} className="inline-flex items-center cursor-pointer text-xs font-semibold text-gray-700">
+                                <input 
+                                  type="radio" 
+                                  name="tumorMargin" 
+                                  checked={formData.tumorMargin === opt.value} 
+                                  onChange={() => setFormData({...formData, tumorMargin: opt.value})}
+                                  className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500 cursor-pointer mr-1"
+                                />
+                                {opt.label}
+                              </label>
+                            ))}
+                          </div>
+                          
+                          {(formData.tumorMargin === 'free' || formData.tumorMargin === 'close') && (
+                            <div className="flex items-center space-x-2 mt-1">
+                              <span className="text-xs text-gray-500 font-medium">Margin size:</span>
+                              <input 
+                                type="text" 
+                                placeholder="e.g. 1"
+                                value={formData.marginSize}
+                                onChange={e => setFormData({...formData, marginSize: e.target.value})}
+                                className="w-20 border border-gray-300 rounded-lg p-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium"
+                              />
+                              <span className="text-xs font-bold text-gray-500">cm</span>
+                            </div>
+                          )}
+
+                          {formData.tumorMargin === 'custom' && (
+                            <input 
+                              type="text" 
+                              placeholder="Specify margin details..." 
+                              value={formData.customMarginDetail}
+                              onChange={e => setFormData({...formData, customMarginDetail: e.target.value})}
+                              className="w-full border border-gray-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white mt-1"
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Liver Segment Selection */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1.5">Liver Segment(s) (Select all that apply):</label>
+                        <div className="flex flex-wrap gap-1">
+                          {['I', 'II', 'III', 'IVa', 'IVb', 'V', 'VI', 'VII', 'VIII'].map(seg => {
+                            const isSelected = formData.selectedSegments?.includes(seg);
+                            return (
+                              <button
+                                key={seg}
+                                type="button"
+                                onClick={() => {
+                                  const prevSegs = formData.selectedSegments || [];
+                                  const nextSegs = isSelected 
+                                    ? prevSegs.filter(s => s !== seg)
+                                    : [...prevSegs, seg];
+                                  setFormData({...formData, selectedSegments: nextSegs});
+                                }}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition select-none cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm font-bold'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                Segment {seg}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="mt-2">
+                          <label className="block text-[11px] font-semibold text-gray-500 mb-1">Other Segment / Custom details (ระบุเซกเมนต์หรือรายละเอียดเพิ่มเติม):</label>
+                          <input 
+                            type="text"
+                            placeholder="e.g. Left lobe, Right lobe, Caudate lobe"
+                            value={formData.customSegment}
+                            onChange={e => setFormData({...formData, customSegment: e.target.value})}
+                            className="w-full border border-gray-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Invasion */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Invasion (การลุกลาม):</label>
+                        <div className="flex items-center space-x-4 mb-2">
+                          <label className="inline-flex items-center cursor-pointer text-xs font-semibold text-gray-700">
+                            <input 
+                              type="radio" 
+                              name="tumorInvasion" 
+                              checked={formData.tumorInvasion === 'No'} 
+                              onChange={() => setFormData({...formData, tumorInvasion: 'No'})}
+                              className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500 cursor-pointer mr-1"
+                            />
+                            No (ไม่มี)
+                          </label>
+                          <label className="inline-flex items-center cursor-pointer text-xs font-semibold text-gray-700">
+                            <input 
+                              type="radio" 
+                              name="tumorInvasion" 
+                              checked={formData.tumorInvasion === 'Yes'} 
+                              onChange={() => setFormData({...formData, tumorInvasion: 'Yes'})}
+                              className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500 cursor-pointer mr-1"
+                            />
+                            Yes (ลุกลาม)
+                          </label>
+                        </div>
+                        {formData.tumorInvasion === 'Yes' && (
+                          <div className="space-y-2 bg-white/50 p-2.5 rounded-lg border border-gray-250">
+                            <div className="flex flex-wrap gap-1">
+                              {['Portal vein', 'Hepatic vein', 'Bile duct', 'Gallbladder', 'Diaphragm'].map(invTarget => {
+                                const currentInvDetails = formData.invasionDetail?.split(',').map(s => s.trim()).filter(Boolean) || [];
+                                const isSelected = currentInvDetails.includes(invTarget);
+                                return (
+                                  <button
+                                    key={invTarget}
+                                    type="button"
+                                    onClick={() => {
+                                      const nextDetails = isSelected
+                                        ? currentInvDetails.filter(d => d !== invTarget)
+                                        : [...currentInvDetails, invTarget];
+                                      setFormData({...formData, invasionDetail: nextDetails.join(', ')});
+                                    }}
+                                    className={`px-2 py-1 rounded border text-[11px] font-semibold transition cursor-pointer select-none ${
+                                      isSelected
+                                        ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
+                                        : 'bg-white text-gray-700 border-gray-250 hover:bg-gray-100'
+                                    }`}
+                                  >
+                                    {invTarget}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <input 
+                              type="text" 
+                              placeholder="Specify other invaded structures / details..." 
+                              value={formData.invasionDetail} 
+                              onChange={e => setFormData({...formData, invasionDetail: e.target.value})} 
+                              className="w-full border border-gray-300 rounded-lg p-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </>
                 )}
 
                 {currentPreset.pd_size && (
@@ -1389,13 +2234,13 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
               <div className="flex justify-between pt-2 gap-3">
                 <button 
-                  onClick={() => setActiveTab('checklist')}
+                  onClick={() => handleTabClick('checklist')}
                   className="bg-gray-200 text-gray-700 font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow hover:bg-gray-300 transition w-full sm:w-auto">
                   <ChevronLeft className="h-4 w-4" />
                   <span>Back</span>
                 </button>
                 <button 
-                  onClick={() => setActiveTab('summary')}
+                  onClick={() => handleTabClick('summary')}
                   className="bg-blue-600 text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow hover:bg-blue-700 transition w-full sm:w-auto">
                   <span>Next: Summary</span>
                   <ChevronRight className="h-4 w-4" />
@@ -1447,13 +2292,13 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
               <div className="flex justify-between pt-2 gap-3">
                 <button 
-                  onClick={() => setActiveTab('findings')}
+                  onClick={() => handleTabClick('findings')}
                   className="bg-gray-200 text-gray-700 font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow hover:bg-gray-300 transition w-full sm:w-auto">
                   <ChevronLeft className="h-4 w-4" />
                   <span>Back</span>
                 </button>
                 <button 
-                  onClick={() => setActiveTab('preview')}
+                  onClick={() => handleTabClick('preview')}
                   className="bg-blue-600 text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow hover:bg-blue-700 transition w-full sm:w-auto">
                   <span>Next: Preview A4 Page</span>
                   <ChevronRight className="h-4 w-4" />
@@ -1466,18 +2311,60 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
         {/* TAB 5: PREVIEW TAB (Strictly Matched to Hospital Form Layout) */}
         <div className={activeTab === 'preview' ? 'block' : 'hidden no-print'}>
-          <div className="no-print mb-4 flex justify-between items-center bg-blue-50 border border-blue-200 p-4 rounded-xl">
-            <button 
-              onClick={() => setActiveTab('summary')}
-              className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-semibold px-3 py-2 rounded-lg flex items-center space-x-1.5 shadow-sm transition">
-              <ChevronLeft className="h-3.5 w-3.5" />
-              <span>Back to Edit Form</span>
-            </button>
+          <div className="no-print mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-center bg-blue-50 border border-blue-200 p-4 rounded-xl gap-3">
+            <div className="flex items-center space-x-2 flex-wrap gap-2">
+              <button 
+                onClick={() => handleTabClick('summary')}
+                className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-semibold px-3 py-2 rounded-lg flex items-center space-x-1.5 shadow-sm transition">
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span>Back to Edit Form</span>
+              </button>
+              <button 
+                onClick={() => setIsZoomed(!isZoomed)}
+                className="max-[820px]:inline-flex hidden text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-2 rounded-lg items-center space-x-1.5 shadow-sm transition"
+              >
+                {isZoomed ? (
+                  <>
+                    <Minimize2 className="h-3.5 w-3.5" />
+                    <span>Fit to Screen (ย่อขนาดพอดีจอ)</span>
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="h-3.5 w-3.5" />
+                    <span>Full Size / Scroll (ขยายเต็มจอ)</span>
+                  </>
+                )}
+              </button>
+            </div>
             <span className="text-xs text-gray-500 font-medium">Standard A4 Document Simulation (Click Print / PDF above to save or print)</span>
           </div>
 
           {/* EXACT A4 PAGE PRINTABLE DOCUMENT */}
-          <div className="a4-page shadow-xl">
+          <div 
+            ref={previewContainerRef}
+            className="w-full overflow-x-auto no-scrollbar"
+          >
+            <div 
+              className="a4-preview-container relative flex justify-center"
+              style={{
+                width: isZoomed ? '794px' : '100%',
+                height: isZoomed ? 'auto' : `${1123 * scale}px`,
+                overflow: isZoomed ? 'visible' : 'hidden',
+                margin: isZoomed ? '0 auto' : undefined,
+              }}
+            >
+              <div 
+                className="a4-preview-scaler origin-top"
+                style={{
+                  transform: isZoomed ? 'none' : `scale(${scale})`,
+                  width: '794px',
+                  position: isZoomed ? 'relative' : 'absolute',
+                  top: 0,
+                  left: isZoomed ? 'auto' : '50%',
+                  marginLeft: isZoomed ? '0' : '-397px'
+                }}
+              >
+                <div className="a4-page shadow-xl">
             <div>
               {/* Header */}
               <div className="flex justify-between items-center mb-3">
@@ -1590,7 +2477,25 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
                   <div>
                     <strong>Findings:</strong>
-                    <p className="whitespace-pre-line text-black font-semibold mt-1 bg-gray-50/50 p-1.5 rounded">{formData.findingTextNotes}</p>
+                    {currentPreset.icg_flr && (
+                      <p className="text-black font-semibold mb-2 leading-relaxed bg-blue-50/10 p-1.5 rounded border border-dashed border-blue-200 text-xs">
+                        • Tumor size <span className="underline">{formData.tumorSize || '......'}</span> cm at liver segment <span className="underline">{(() => {
+                          const segs = formData.selectedSegments || [];
+                          const parts = [];
+                          if (segs.length > 0) parts.push(segs.join(', '));
+                          if (formData.customSegment) parts.push(formData.customSegment);
+                          return parts.join(' ') || '........';
+                        })()}</span>, invade: <span className="underline">{formData.tumorInvasion === 'Yes' ? formData.invasionDetail || 'yes' : 'no'}</span>, surgical margin: <span className="underline">{
+                          formData.tumorMargin === 'free' ? `free margin ${formData.marginSize || '.....'} cm` :
+                          formData.tumorMargin === 'positive' ? 'positive margin' :
+                          formData.tumorMargin === 'close' ? `close margin ${formData.marginSize || '.....'} cm` :
+                          formData.customMarginDetail || 'free margin?'
+                        }</span>
+                      </p>
+                    )}
+                    {formData.findingTextNotes && (
+                      <p className="whitespace-pre-line text-black font-semibold mt-1 bg-gray-50/50 p-1.5 rounded">{formData.findingTextNotes}</p>
+                    )}
                   </div>
 
                   {/* Uploaded Photos Preview in Note */}
@@ -1703,10 +2608,154 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
               </table>
             </div>
 
+              </div>
+            </div>
           </div>
         </div>
-
       </div>
+    </div>
+
+      {/* Template Modal Dialog */}
+      {isTemplateModalOpen && (
+        <div className="fixed inset-0 bg-black/55 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="bg-blue-800 text-white px-5 py-4 flex justify-between items-center">
+              <h3 className="font-bold text-base flex items-center space-x-2">
+                <Save className="h-5 w-5 text-yellow-300" />
+                <span>Save as New Template (บันทึกเทมเพลตใหม่)</span>
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setIsTemplateModalOpen(false)}
+                className="text-white/80 hover:text-white transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="p-5 overflow-y-auto space-y-4 text-sm text-gray-700">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">Template Name (ชื่อเทมเพลต เช่น Hilar Resection)</label>
+                <input 
+                  type="text"
+                  value={templateModalData.name}
+                  onChange={e => setTemplateModalData({...templateModalData, name: e.target.value})}
+                  placeholder="e.g. Hilar Resection"
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">Procedure Title (หัวข้อเอกสารใบผ่าตัด)</label>
+                <input 
+                  type="text"
+                  value={templateModalData.title}
+                  onChange={e => setTemplateModalData({...templateModalData, title: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Patient Position (ท่าผู้ป่วย)</label>
+                  <input 
+                    type="text"
+                    value={templateModalData.position}
+                    onChange={e => setTemplateModalData({...templateModalData, position: e.target.value})}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Incision (แนวแผลผ่าตัด)</label>
+                  <input 
+                    type="text"
+                    value={templateModalData.incision}
+                    onChange={e => setTemplateModalData({...templateModalData, incision: e.target.value})}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Lymph Node options */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">Lymph Node Options (ตัวเลือกต่อมน้ำเหลือง คั่นด้วยจุลภาค `,` )</label>
+                <input 
+                  type="text"
+                  value={templateModalData.ln_options_str}
+                  onChange={e => setTemplateModalData({...templateModalData, ln_options_str: e.target.value})}
+                  placeholder="e.g. gr8, gr12, gr13"
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                />
+              </div>
+
+              {/* Toggle configurations */}
+              <div className="space-y-2 pt-2">
+                <label className="block text-xs font-bold text-gray-500 mb-1">Findings Page Config (การกำหนดค่าฟิลด์ที่จะแสดง)</label>
+                
+                <label className="flex items-center space-x-2 py-1 cursor-pointer">
+                  <input 
+                    type="checkbox"
+                    checked={templateModalData.is_laparoscopic}
+                    onChange={e => setTemplateModalData({...templateModalData, is_laparoscopic: e.target.checked})}
+                    className="h-4.5 w-4.5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span className="font-semibold text-xs text-gray-700">Laparoscopic Procedure (เป็นการผ่าตัดผ่านกล้อง)</span>
+                </label>
+
+                <label className="flex items-center space-x-2 py-1 cursor-pointer">
+                  <input 
+                    type="checkbox"
+                    checked={templateModalData.icg_flr}
+                    onChange={e => setTemplateModalData({...templateModalData, icg_flr: e.target.checked})}
+                    className="h-4.5 w-4.5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span className="font-semibold text-xs text-gray-700">Show ICG R-15 & FLR inputs</span>
+                </label>
+
+                <label className="flex items-center space-x-2 py-1 cursor-pointer">
+                  <input 
+                    type="checkbox"
+                    checked={templateModalData.pd_size}
+                    onChange={e => setTemplateModalData({...templateModalData, pd_size: e.target.checked})}
+                    className="h-4.5 w-4.5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span className="font-semibold text-xs text-gray-700">Show PD Size & Pancreatic Consistency inputs</span>
+                </label>
+              </div>
+
+              {/* Steps Preview */}
+              <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                <div className="font-bold text-xs text-gray-600 mb-1">Checklist Steps Preview ({checklist.length} steps):</div>
+                <div className="max-h-24 overflow-y-auto text-[11px] font-mono text-gray-500 space-y-1">
+                  {checklist.map((c, i) => (
+                    <div key={i} className="truncate">{i+1}. {c.text}</div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="bg-gray-50 border-t px-5 py-4 flex justify-end space-x-2">
+              <button 
+                type="button" 
+                onClick={() => setIsTemplateModalOpen(false)}
+                className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold px-4 py-2 rounded-lg text-xs transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                onClick={handleSaveNewTemplate}
+                className="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded-lg text-xs shadow transition cursor-pointer"
+              >
+                Save Template
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
