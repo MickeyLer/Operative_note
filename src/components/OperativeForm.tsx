@@ -315,7 +315,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
   // Procedure Checklist State
   const [checklist, setChecklist] = useState<{ id: number; text: string; checked: boolean; templateText?: string; selections?: Record<number, string> }[]>([]);
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
-  const [lastDeletedItem, setLastDeletedItem] = useState<{ item: any; index: number } | null>(null);
+  const [lastDeletedItem, setLastDeletedItem] = useState<{ item: { id: number; text: string; checked: boolean; templateText?: string; selections?: Record<number, string> }; index: number } | null>(null);
 
   // Drag and Drop State & Refs
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -775,11 +775,13 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
   const toggleLN = (ln: string) => {
     setFormData(prev => {
       const exists = prev.selectedLN.includes(ln);
+      const nextSelectedLN = exists 
+        ? prev.selectedLN.filter(item => item !== ln)
+        : [...prev.selectedLN, ln];
       return {
         ...prev,
-        selectedLN: exists 
-          ? prev.selectedLN.filter(item => item !== ln)
-          : [...prev.selectedLN, ln]
+        selectedLN: nextSelectedLN,
+        consistency: nextSelectedLN.length === 0 ? "" : prev.consistency
       };
     });
   };
@@ -1256,19 +1258,30 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     <label className="block text-xs font-semibold text-gray-500 mb-1">Ward (หอผู้ป่วย)</label>
                     <input 
                       type="text" 
+                      list="ward-options"
                       value={formData.ward} 
                       onChange={e => setFormData({...formData, ward: e.target.value})} 
                       className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                    <datalist id="ward-options">
+                      <option value="ศช1" />
+                      <option value="ศช2" />
+                      <option value="ศญ1" />
+                      <option value="ศญ2" />
+                    </datalist>
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1">Department (แผนก)</label>
                     <input 
                       type="text" 
+                      list="department-options"
                       value={formData.department} 
                       onChange={e => setFormData({...formData, department: e.target.value})} 
                       className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                    <datalist id="department-options">
+                      <option value="ศัลยกรรม" />
+                    </datalist>
                   </div>
                 </div>
               </div>
@@ -1314,10 +1327,14 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     <label className="block text-xs font-semibold text-gray-500 mb-1">Surgeon (ศัลยแพทย์ผู้ทำผ่าตัด)</label>
                     <input 
                       type="text" 
+                      list="surgeon-options"
                       value={formData.surgeon} 
                       onChange={e => setFormData({...formData, surgeon: e.target.value})} 
                       className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                    <datalist id="surgeon-options">
+                      <option value="พ.เลอพงศ์" />
+                    </datalist>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
@@ -1345,10 +1362,14 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                       <label className="block text-xs font-semibold text-gray-500 mb-1">Anesthesia (วิธีดมยา)</label>
                       <input 
                         type="text" 
+                        list="anesthesia-options"
                         value={formData.anesthesia} 
                         onChange={e => setFormData({...formData, anesthesia: e.target.value})} 
                         className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
+                      <datalist id="anesthesia-options">
+                        <option value="GA" />
+                      </datalist>
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 mb-1">Anesthetist (วิสัญญีแพทย์)</label>
@@ -1963,24 +1984,26 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                 </div>
 
                 {/* Consistency Buttons */}
-                <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-2 font-sans">Tissue/Tumor Consistency:</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['hard', 'firm', 'soft'].map(c => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setFormData({...formData, consistency: c})}
-                        className={`py-2.5 text-xs font-semibold capitalize rounded-xl border text-center transition cursor-pointer select-none ${
-                          formData.consistency === c
-                            ? 'bg-amber-500 text-white border-amber-600 shadow-sm font-bold'
-                            : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
-                        }`}>
-                        {c}
-                      </button>
-                    ))}
+                {formData.selectedLN.length > 0 && (
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-2 font-sans">Lymph Node Consistency:</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['hard', 'firm', 'soft'].map(c => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setFormData({...formData, consistency: c})}
+                          className={`py-2.5 text-xs font-semibold capitalize rounded-xl border text-center transition cursor-pointer select-none ${
+                            formData.consistency === c
+                              ? 'bg-amber-500 text-white border-amber-600 shadow-sm font-bold'
+                              : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
+                          }`}>
+                          {c}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Adhesion & Vascular Checkboxes */}
                 <div className="space-y-3 text-xs font-semibold text-gray-700">
@@ -2195,7 +2218,6 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                   <input 
                     type="file" 
                     accept="image/*" 
-                    capture="environment"
                     multiple
                     onChange={handlePhotoUpload} 
                     className="hidden" 
@@ -2369,12 +2391,12 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
               {/* Header */}
               <div className="flex justify-between items-center mb-3">
                 <div className="text-sm font-semibold">Khon Kaen Hospital</div>
-                <div className="text-lg font-bold underline">{formData.operativeProcedure}</div>
+                <div className="text-lg font-bold underline">Operative Note</div>
                 <div className="w-24"></div>
               </div>
 
               {/* Meta Header Lines */}
-              <div className="space-y-1 mb-2 text-[13.5px]">
+              <div className="space-y-1 mb-2 text-[13.5px] a4-meta-header">
                 <div className="flex justify-between">
                   <div>Date of operative: <span className="dot-line min-w-[120px]">{formData.opDate}</span></div>
                   <div>Time started: <span className="dot-line min-w-[70px]">{formData.timeStarted}</span></div>
@@ -2450,65 +2472,144 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     </div>
                   )}
 
-                  {isLaparoscopic && formData.ports && formData.ports.length > 0 && (
-                    <div className="my-2 p-1 bg-white flex flex-col items-center">
-                      <div className="font-bold text-[10px] mb-1">Laparoscopic Ports:</div>
-                      <div className="relative w-36 h-[155px] bg-white overflow-hidden">
-                        <div 
-                          className="absolute inset-0 bg-contain bg-no-repeat bg-center" 
-                          style={{ backgroundImage: "url('/abdomen.jpg')" }}
-                        />
-                        {formData.ports.map(port => (
-                          <div
-                            key={port.id}
-                            style={{ left: `${port.x}%`, top: `${port.y}%` }}
-                            className={`absolute -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border border-white flex items-center justify-center text-[6px] font-bold text-white shadow ${
-                              port.size === '5mm' ? 'bg-green-600' :
-                              port.size === '10mm' ? 'bg-orange-500' :
-                              'bg-red-600'
-                            }`}
-                          >
-                            {port.size.replace('mm', '')}
+                  {/* Laparoscopic Ports & Specimen Photos Layout */}
+                  {isLaparoscopic && formData.ports && formData.ports.length > 0 ? (
+                    <div className="space-y-1.5">
+                      <div className="flex gap-2 items-stretch my-1.5">
+                        {/* Ports Diagram (Left) */}
+                        <div className={`flex flex-col items-center p-1 bg-white rounded border border-gray-200/50 shadow-sm ${formData.photos.length > 0 ? 'w-[42%]' : 'w-full max-w-[160px] mx-auto'}`}>
+                          <div className="font-bold text-[9px] mb-0.5 text-gray-700">Laparoscopic Ports:</div>
+                          <div className="relative w-28 h-[120px] bg-white overflow-hidden rounded border border-gray-100 a4-ports-container">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img 
+                              src="/abdomen.jpg" 
+                              alt="Abdomen outline" 
+                              className="absolute inset-0 w-full h-full object-contain pointer-events-none print-abdomen-bg" 
+                            />
+                            {formData.ports.map(port => (
+                              <div
+                                key={port.id}
+                                style={{ left: `${port.x}%`, top: `${port.y}%` }}
+                                className={`absolute -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border border-white flex items-center justify-center text-[7px] font-bold text-white shadow ${
+                                  port.size === '5mm' ? 'bg-green-600' :
+                                  port.size === '10mm' ? 'bg-orange-500' :
+                                  'bg-red-600'
+                                }`}
+                              >
+                                {port.size.replace('mm', '')}
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        </div>
+
+                        {/* Specimen Photos 1-2 (Right) */}
+                        {formData.photos.length > 0 && (
+                          <div className="w-[58%] flex flex-col">
+                            <div className="font-bold text-[9px] mb-0.5 text-gray-700 text-center">Specimen Findings:</div>
+                            <div className={`grid ${formData.photos.slice(0, 2).length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-1.5 grow`}>
+                              {formData.photos.slice(0, 2).map((img, i) => (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <div key={i} className="relative w-full h-full min-h-[120px] bg-gray-50 rounded overflow-hidden a4-photo-container">
+                                  <img 
+                                    src={img} 
+                                    alt={`Finding photo ${i+1}`} 
+                                    className="absolute inset-0 w-full h-full object-cover specimen-print-photo"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
+
+                      {/* Findings Details Text Box */}
+                      <div>
+                        <strong>Findings:</strong>
+                        {currentPreset.icg_flr && (
+                          <p className="text-black font-semibold mb-1 leading-relaxed bg-blue-50/10 p-1 rounded border border-dashed border-blue-200 text-xs">
+                            • Tumor size <span className="underline">{formData.tumorSize || '......'}</span> cm at liver segment <span className="underline">{(() => {
+                              const segs = formData.selectedSegments || [];
+                              const parts = [];
+                              if (segs.length > 0) parts.push(segs.join(', '));
+                              if (formData.customSegment) parts.push(formData.customSegment);
+                              return parts.join(' ') || '........';
+                            })()}</span>, invade: <span className="underline">{formData.tumorInvasion === 'Yes' ? formData.invasionDetail || 'yes' : 'no'}</span>, surgical margin: <span className="underline">{
+                              formData.tumorMargin === 'free' ? `free margin ${formData.marginSize || '.....'} cm` :
+                              formData.tumorMargin === 'positive' ? 'positive margin' :
+                              formData.tumorMargin === 'close' ? `close margin ${formData.marginSize || '.....'} cm` :
+                              formData.customMarginDetail || 'free margin?'
+                            }</span>
+                          </p>
+                        )}
+                        {formData.findingTextNotes && (
+                          <p className="whitespace-pre-line text-black font-semibold mt-0.5 bg-gray-50/50 p-1 rounded">{formData.findingTextNotes}</p>
+                        )}
+                      </div>
+
+                      {/* Remaining Photos (Photos 3-4, if any) */}
+                      {formData.photos.length > 2 && (
+                        <div className="grid grid-cols-2 gap-1.5 my-1.5">
+                          {formData.photos.slice(2, 4).map((img, i) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <div key={i} className="relative w-full h-[110px] bg-gray-50 rounded overflow-hidden a4-photo-container">
+                              <img 
+                                src={img} 
+                                alt={`Finding photo ${i+3}`} 
+                                className="absolute inset-0 w-full h-full object-cover specimen-print-photo"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // Non-laparoscopic case: No ports diagram, only photos
+                    <div className="space-y-1.5">
+                      {/* Findings Details Text Box */}
+                      <div>
+                        <strong>Findings:</strong>
+                        {currentPreset.icg_flr && (
+                          <p className="text-black font-semibold mb-1 leading-relaxed bg-blue-50/10 p-1 rounded border border-dashed border-blue-200 text-xs">
+                            • Tumor size <span className="underline">{formData.tumorSize || '......'}</span> cm at liver segment <span className="underline">{(() => {
+                              const segs = formData.selectedSegments || [];
+                              const parts = [];
+                              if (segs.length > 0) parts.push(segs.join(', '));
+                              if (formData.customSegment) parts.push(formData.customSegment);
+                              return parts.join(' ') || '........';
+                            })()}</span>, invade: <span className="underline">{formData.tumorInvasion === 'Yes' ? formData.invasionDetail || 'yes' : 'no'}</span>, surgical margin: <span className="underline">{
+                              formData.tumorMargin === 'free' ? `free margin ${formData.marginSize || '.....'} cm` :
+                              formData.tumorMargin === 'positive' ? 'positive margin' :
+                              formData.tumorMargin === 'close' ? `close margin ${formData.marginSize || '.....'} cm` :
+                              formData.customMarginDetail || 'free margin?'
+                            }</span>
+                          </p>
+                        )}
+                        {formData.findingTextNotes && (
+                          <p className="whitespace-pre-line text-black font-semibold mt-0.5 bg-gray-50/50 p-1 rounded">{formData.findingTextNotes}</p>
+                        )}
+                      </div>
+
+                      {formData.photos.length > 0 && (
+                        <div className="space-y-1 my-1.5">
+                          <div className="font-bold text-[9px] text-gray-700 text-center">Specimen Findings:</div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {formData.photos.slice(0, 4).map((img, i) => (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <div key={i} className="relative w-full h-[110px] bg-gray-50 rounded overflow-hidden a4-photo-container">
+                                <img 
+                                  src={img} 
+                                  alt={`Finding photo ${i+1}`} 
+                                  className="absolute inset-0 w-full h-full object-cover specimen-print-photo"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  <div>
-                    <strong>Findings:</strong>
-                    {currentPreset.icg_flr && (
-                      <p className="text-black font-semibold mb-2 leading-relaxed bg-blue-50/10 p-1.5 rounded border border-dashed border-blue-200 text-xs">
-                        • Tumor size <span className="underline">{formData.tumorSize || '......'}</span> cm at liver segment <span className="underline">{(() => {
-                          const segs = formData.selectedSegments || [];
-                          const parts = [];
-                          if (segs.length > 0) parts.push(segs.join(', '));
-                          if (formData.customSegment) parts.push(formData.customSegment);
-                          return parts.join(' ') || '........';
-                        })()}</span>, invade: <span className="underline">{formData.tumorInvasion === 'Yes' ? formData.invasionDetail || 'yes' : 'no'}</span>, surgical margin: <span className="underline">{
-                          formData.tumorMargin === 'free' ? `free margin ${formData.marginSize || '.....'} cm` :
-                          formData.tumorMargin === 'positive' ? 'positive margin' :
-                          formData.tumorMargin === 'close' ? `close margin ${formData.marginSize || '.....'} cm` :
-                          formData.customMarginDetail || 'free margin?'
-                        }</span>
-                      </p>
-                    )}
-                    {formData.findingTextNotes && (
-                      <p className="whitespace-pre-line text-black font-semibold mt-1 bg-gray-50/50 p-1.5 rounded">{formData.findingTextNotes}</p>
-                    )}
-                  </div>
-
-                  {/* Uploaded Photos Preview in Note */}
-                  {formData.photos.length > 0 && (
-                    <div className="grid grid-cols-2 gap-1.5 my-2">
-                      {formData.photos.slice(0, 4).map((img, i) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={i} src={img} alt={`Finding photo ${i+1}`} className="max-h-24 w-full object-contain border border-black/35 rounded p-0.5"/>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="pt-2 space-y-1.5 text-[11px] leading-tight">
+                  <div className="pt-2 space-y-1.5 text-[11px] leading-tight a4-findings-list">
                     <div>
                       <strong>Enlarge LN:</strong> {currentPreset.ln_options.map(ln => (
                         <span key={ln} className="ml-1.5 inline-block font-semibold">
@@ -2517,12 +2618,14 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                       ))}
                     </div>
 
-                    <div className="font-semibold">
-                      <strong>Consistency:</strong>
-                      <span className="ml-2">{formData.consistency === 'hard' ? '●' : '○'} hard</span>
-                      <span className="ml-2">{formData.consistency === 'firm' ? '●' : '○'} firm</span>
-                      <span className="ml-2">{formData.consistency === 'soft' ? '●' : '○'} soft</span>
-                    </div>
+                    {formData.selectedLN.length > 0 && (
+                      <div className="font-semibold">
+                        <strong>LN Consistency:</strong>
+                        <span className="ml-2">{formData.consistency === 'hard' ? '●' : '○'} hard</span>
+                        <span className="ml-2">{formData.consistency === 'firm' ? '●' : '○'} firm</span>
+                        <span className="ml-2">{formData.consistency === 'soft' ? '●' : '○'} soft</span>
+                      </div>
+                    )}
 
                     <div>
                       <strong>Adhesion around HD:</strong>
@@ -2551,7 +2654,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                 </div>
 
                 {/* Right Column - Procedure Steps (7 cols) */}
-                <div className="col-span-7 pl-1.5 text-xs space-y-1.5">
+                <div className="col-span-7 pl-1.5 text-xs space-y-1.5 a4-steps-col">
                   <div className="font-bold border-b pb-0.5 border-black">Procedure Steps Completed:</div>
                   {checklist.filter(item => item.checked).map((item, idx) => (
                     <div key={idx} className="flex items-start space-x-2 text-[12px] leading-tight">
@@ -2563,7 +2666,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
               </div>
 
               {/* EBL Box & Signature Row */}
-              <div className="flex justify-between items-end mt-4">
+              <div className="flex justify-between items-end mt-4 a4-summary-row">
                 {/* EBL Box */}
                 <div className="border border-black p-2.5 w-[58%] text-xs space-y-1">
                   <div>EBL: <span className="font-bold text-sm">{formData.ebl}</span> ml &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Complication: <span className="font-bold">{formData.complication}</span></div>
@@ -2579,7 +2682,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
             </div>
 
             {/* Patient Info Footer Grid Table */}
-            <div className="mt-4 border-t-2 border-black pt-1">
+            <div className="a4-footer mt-4 border-t-2 border-black pt-1">
               <table className="w-full border-collapse border border-black text-xs">
                 <tbody>
                   <tr>

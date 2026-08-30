@@ -43,41 +43,130 @@ body {
 
 /* Print CSS Strategy */
 @media print {
-  body {
-    background: white !important;
-    padding: 0 !important;
+  html, body {
+    height: 100%;
     margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   .no-print {
     display: none !important;
   }
+  /* .a4-page acts as the print-container */
   .a4-page {
     box-shadow: none !important;
     margin: 0 !important;
-    width: 210mm !important;
-    min-height: 297mm !important;
-    height: auto !important;
-    padding: 10mm 12mm 10mm 12mm !important;
-    font-size: 11px !important;
-    line-height: 1.25 !important;
-    page-break-after: auto !important;
-    page-break-inside: auto !important;
-    justify-content: flex-start !important;
-    overflow: visible !important;
-  }
-  /* Limit photo height in print to save vertical space */
-  .a4-page img {
-    max-height: 45px !important;
-    width: auto !important;
-  }
-  /* Remove min-height from findings column in print */
-  .a4-findings-col {
+    width: 100% !important; /* Full width of printable area */
+    max-height: 280mm !important; /* Force to fit A4 height */
     min-height: 0 !important;
+    height: 280mm !important; /* Force exact container height */
+    padding: 0 !important; /* Margin handled by @page */
+    font-size: 11px !important; /* Restored to clear, readable 11px */
+    line-height: 1.25 !important;
+    display: block !important;
+    position: relative !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-sizing: border-box !important;
   }
-  /* Reduce spacing between procedure steps in print */
-  .a4-steps-col > div + div {
-    margin-top: 1px !important;
+  /* Footer: absolutely positioned at the bottom of the A4 page container */
+  .a4-footer {
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    margin-top: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
+  /* Cascade break-avoidance into table rows */
+  .a4-footer table,
+  .a4-footer tbody,
+  .a4-footer tr,
+  .a4-footer td {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  /* Convert table to block/flex for reliable layout */
+  .a4-footer table  { display: block !important; width: 100% !important; }
+  .a4-footer tbody  { display: block !important; width: 100% !important; }
+  .a4-footer tr     { display: flex !important; width: 100% !important; }
+  .a4-footer td     { border: 1px solid black !important; padding: 3px 5px !important; font-size: 11px !important; box-sizing: border-box !important; }
+  /* Row 1 column widths: 45% | 15% | 40% */
+  .a4-footer tr:first-child td:nth-child(1) { flex: 0 0 45% !important; }
+  .a4-footer tr:first-child td:nth-child(2) { flex: 0 0 15% !important; }
+  .a4-footer tr:first-child td:nth-child(3) { flex: 0 0 40% !important; }
+  /* Row 2: equal thirds */
+  .a4-footer tr:last-child td { flex: 1 !important; }
+  
+  /* Specimen Photos print sizes */
+  .a4-page img.specimen-print-photo {
+    max-height: none !important;
+    height: 100% !important;
+    width: 100% !important;
+    object-fit: cover !important;
+  }
+  /* Ensure abdomen background prints correctly */
+  .a4-page img.print-abdomen-bg {
+    max-height: none !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+  }
+  /* Remove min-height from findings column */
+  .a4-findings-col { min-height: 0 !important; }
+  .a4-page .col-span-5 { min-height: 0 !important; }
+  
+  /* Reduce Tailwind space-y margins on procedure steps to save vertical space */
+  .a4-steps-col > div {
+    margin-top: 3px !important;
+    margin-bottom: 0 !important;
+  }
+  .a4-steps-col > div:first-child {
+    margin-top: 0 !important;
+    margin-bottom: 5px !important;
+  }
+
+  /* Reduce Tailwind space-y margins on findings list to save vertical space */
+  .a4-findings-list > div {
+    margin-top: 3.5px !important;
+  }
+  .a4-findings-list > div:first-child {
+    margin-top: 0 !important;
+  }
+
+  /* Shrink ports and photo container heights to save height (90px limit for better balance) */
+  .a4-ports-container {
+    height: 90px !important;
+    width: 81px !important; /* Keep aspect ratio of abdomen image at 90px height */
+  }
+  .a4-photo-container {
+    height: 90px !important;
+    min-height: 90px !important;
+  }
+
+  /* Balanced margins in meta-header section */
+  .a4-meta-header {
+    margin-bottom: 5px !important;
+  }
+  .a4-meta-header > div {
+    margin-top: 2px !important;
+    line-height: 1.2 !important;
+  }
+  .a4-meta-header .flex,
+  .a4-meta-header .grid {
+    margin-bottom: 2px !important;
+    padding: 0 !important;
+  }
+
+  /* Separate summary row and EBL box from grid content */
+  .a4-summary-row {
+    margin-top: 25px !important;
+  }
+
   .a4-preview-container {
     width: auto !important;
     height: auto !important;
@@ -94,7 +183,7 @@ body {
   }
   @page {
     size: A4 portrait;
-    margin: 0;
+    margin: 8mm 10mm; /* บีบ margin ด้านบน-ล่างให้แคบลงเหลือ 8-10mm */
   }
 }
 
