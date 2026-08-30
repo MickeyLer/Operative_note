@@ -966,7 +966,9 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       return;
     }
     setActiveTab(tab);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
   };
 
   const moveChecklistItem = (index: number, direction: 'up' | 'down') => {

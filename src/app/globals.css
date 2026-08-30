@@ -59,26 +59,23 @@ body {
     box-shadow: none !important;
     margin: 0 !important;
     width: 100% !important; /* Full width of printable area */
-    max-height: 280mm !important; /* Force to fit A4 height */
-    min-height: 0 !important;
-    height: 280mm !important; /* Force exact container height */
+    max-height: 270mm !important; /* Force to fit A4 height safely on desktop and mobile */
+    min-height: 270mm !important;
+    height: 270mm !important; /* Force exact container height */
     padding: 0 !important; /* Margin handled by @page */
     font-size: 11px !important; /* Restored to clear, readable 11px */
     line-height: 1.25 !important;
-    display: block !important;
-    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important; /* Push footer to the bottom */
     overflow: hidden !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     box-sizing: border-box !important;
   }
-  /* Footer: absolutely positioned at the bottom of the A4 page container */
+  /* Footer: positioned at the bottom of the A4 page using flex margin-top: auto */
   .a4-footer {
-    position: absolute !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    margin-top: 0 !important;
+    margin-top: auto !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
