@@ -36,6 +36,7 @@ const OP_LABEL_MAP: Record<string, string> = {
   whipple: 'Whipple Operation',
   lap_lar: 'Laparoscopic LAR',
   lap_chole: 'Laparoscopic Cholecystectomy',
+  ramps: 'Distal Pancreatosplenectomy with RAMPS',
 };
 
 export default function Dashboard() {
@@ -170,6 +171,7 @@ export default function Dashboard() {
                 <option value="whipple">Whipple Operation</option>
                 <option value="lap_lar">Laparoscopic LAR</option>
                 <option value="lap_chole">Laparoscopic Cholecystectomy</option>
+                <option value="ramps">Distal Pancreatosplenectomy with RAMPS</option>
               </optgroup>
               {userTemplates.length > 0 && (
                 <optgroup label="My Templates (เทมเพลตของฉัน)">

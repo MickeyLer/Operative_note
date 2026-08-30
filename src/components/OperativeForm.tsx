@@ -27,7 +27,7 @@ import {
   GripVertical
 } from 'lucide-react';
 
-type OpKey = 'open_hepatectomy' | 'lap_hepatectomy' | 'whipple' | 'lap_lar' | 'lap_chole';
+type OpKey = 'open_hepatectomy' | 'lap_hepatectomy' | 'whipple' | 'lap_lar' | 'lap_chole' | 'ramps';
 
 interface OperationPreset {
   title: string;
@@ -55,7 +55,7 @@ interface UserTemplate {
 
 const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
   open_hepatectomy: {
-    title: "Operative Note (Hepatectomy)",
+    title: "Hepatectomy",
     position: "Supine",
     incision: "Mirror-L incision",
     icg_flr: true,
@@ -79,7 +79,7 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
     ]
   },
   lap_hepatectomy: {
-    title: "Operative Note (Laparoscopic Hepatectomy)",
+    title: "Laparoscopic Hepatectomy",
     position: "Supine with legs split (French position)",
     incision: "Laparoscopic port sites (12 mm camera port, 10 mm and 5 mm working ports)",
     icg_flr: true,
@@ -98,7 +98,7 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
     ]
   },
   whipple: {
-    title: "Operative Note (Whipple Procedure)",
+    title: "Whipple operation",
     position: "Supine",
     incision: "Midline incision",
     pd_size: true,
@@ -126,7 +126,7 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
     ]
   },
   lap_lar: {
-    title: "Operative Note (Laparoscopic Low Anterior Resection with Anastomosis)",
+    title: "Laparoscopic Low Anterior Resection with Anastomosis",
     position: "Modified lithotomy position",
     incision: "Laparoscopic port sites and mini-laparotomy for extraction",
     ln_options: ["IMA origin", "IMV level", "Pelvic LN"],
@@ -146,7 +146,7 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
     ]
   },
   lap_chole: {
-    title: "Operative Note (Laparoscopic Cholecystectomy)",
+    title: "Laparoscopic Cholecystectomy",
     position: "Supine / Reverse Trendelenburg with left tilt",
     incision: "4-port technique (10 mm umbilical, 10 mm epigastric, and two 5 mm RUQ ports)",
     ln_options: ["Calot LN"],
@@ -161,6 +161,36 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "Hemostasis of the gallbladder fossa was verified.",
       "The gallbladder was extracted in an extraction bag (Endo-bag) via the umbilical port.",
       "The abdomen was deflated, and the port sites were closed."
+    ]
+  },
+  ramps: {
+    title: "Radical Antegrade Modular Pancreatosplenectomy (RAMPS)",
+    position: "Supine / Reverse Trendelenburg with right lateral tilt",
+    incision: "Bilateral subcostal (Chevron) incision",
+    ln_options: [
+      "gr8 (Common Hepatic Artery)",
+      "gr9 (Celiac Trunk)",
+      "gr11 (Splenic Artery)",
+      "gr12 (Hepatoduodenal)",
+      "gr14 (SMA)",
+      "gr18 (Inferior Pancreatic)"
+    ],
+    procedures: [
+      "A skin incision was made and the abdomen was entered.",
+      "A thorough exploration of the abdominal cavity was performed to rule out peritoneal and hepatic metastases.",
+      "The gastrocolic omentum was divided to enter the lesser sac, and the pancreas was fully exposed.",
+      "The inferior border of the pancreas was mobilized, and the superior mesenteric vein (SMV) was identified.",
+      "Anterior dissection of the celiac trunk and superior mesenteric artery (SMA) was performed to achieve complete lymphadenectomy (Groups 8, 9, 11, 14, and 18).",
+      "The splenic artery was isolated and ligated at its origin from the celiac axis.",
+      "A tunnel was created posterior to the pancreatic neck, and the pancreatic neck was divided using a linear stapler.",
+      "The splenic vein was identified at the junction with the SMV, and was divided and suture-ligated/stapled.",
+      "Retroperitoneal dissection was performed in an antegrade (right-to-left) fashion.",
+      "The plane of posterior dissection was determined: [Anterior RAMPS - anterior to Gerota's fascia / Posterior RAMPS - posterior to Gerota's fascia, including the left adrenal gland].",
+      "The dissection was carried laterally to the left renal vein, which was identified and preserved.",
+      "The specimen, consisting of the distal pancreas, spleen, and regional lymph nodes, was removed en bloc.",
+      "Hemostasis was verified and secured.",
+      "A JP drain was placed in the left subdiaphragmatic space / pancreatic bed.",
+      "The abdomen was closed in layers using a PDS loop suture, and the skin was approximated with staples."
     ]
   }
 };
@@ -215,7 +245,7 @@ interface OperativeFormProps {
 export default function OperativeForm({ noteId, initialPrint = false }: OperativeFormProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'info' | 'checklist' | 'findings' | 'summary' | 'preview'>('info');
-  const [selectedOpKey, setSelectedOpKey] = useState<string>('open_hepatectomy');
+  const [selectedOpKey, setSelectedOpKey] = useState<string>('');
   const [loading, setLoading] = useState(!!noteId);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -225,6 +255,31 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
   const [scale, setScale] = useState(1);
   const [isZoomed, setIsZoomed] = useState(false);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (activeTab !== 'preview') return;
+    
+    const calculateScale = () => {
+      if (previewContainerRef.current) {
+        const containerWidth = previewContainerRef.current.clientWidth;
+        if (containerWidth < 794) {
+          setScale(Math.max(0.2, (containerWidth - 32) / 794));
+        } else {
+          setScale(1);
+        }
+      }
+    };
+
+    calculateScale();
+    window.addEventListener('resize', calculateScale);
+    
+    const timeoutId = setTimeout(calculateScale, 100);
+    
+    return () => {
+      window.removeEventListener('resize', calculateScale);
+      clearTimeout(timeoutId);
+    };
+  }, [activeTab]);
 
   // User Templates State
   const [userTemplates, setUserTemplates] = useState<UserTemplate[]>([]);
@@ -309,7 +364,11 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     photos: [] as string[],
     
     // Laparoscopic Port sites
-    ports: [] as { id: string; x: number; y: number; size: string }[]
+    ports: [] as { id: string; x: number; y: number; size: string }[],
+
+    // Custom Position and Incision choices
+    position: "",
+    incision: ""
   });
 
   // Procedure Checklist State
@@ -391,26 +450,40 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
   };
 
   const syncChecklist = (opKey: string, templatesList: UserTemplate[] = userTemplates) => {
+    let presetProcedures: string[] = [];
+    
     const preset = OPERATION_PRESETS[opKey as OpKey];
     if (preset) {
-      setChecklist(preset.procedures.map((proc, idx) => ({
-        id: idx,
-        text: proc,
-        templateText: proc,
-        checked: true,
-        selections: {}
-      })));
-      return;
+      presetProcedures = preset.procedures;
+    } else {
+      const userTpl = templatesList.find(t => t.id === opKey);
+      if (userTpl) {
+        presetProcedures = userTpl.procedures;
+      }
     }
-    const userTpl = templatesList.find(t => t.id === opKey);
-    if (userTpl) {
-      setChecklist(userTpl.procedures.map((proc, idx) => ({
-        id: idx,
-        text: proc,
-        templateText: proc,
-        checked: true,
-        selections: {}
-      })));
+
+    if (presetProcedures.length > 0) {
+      setChecklist(presetProcedures.map((proc, idx) => {
+        const regex = /<([^>]+)>/g;
+        const selections: Record<number, string> = {};
+        let phIndex = 0;
+        
+        const newText = proc.replace(regex, (match, content) => {
+          const options = content.split(/[\/|]/).map((o: string) => o.trim());
+          const defaultOpt = options[0]; // Set first option as default
+          selections[phIndex] = defaultOpt;
+          phIndex++;
+          return defaultOpt;
+        });
+
+        return {
+          id: idx,
+          text: newText,
+          templateText: proc,
+          checked: true,
+          selections: selections
+        };
+      }));
     }
   };
 
@@ -454,7 +527,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       const templatesList = await fetchUserTemplates();
 
       if (!noteId) {
-        syncChecklist('open_hepatectomy', templatesList);
+        setChecklist([]);
         setLoading(false);
         return;
       }
@@ -526,7 +599,9 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
             photos: data.photos || [],
             
             // Ports
-            ports: data.findings?.ports || []
+            ports: data.findings?.ports || [],
+            position: data.findings?.position || "",
+            incision: data.findings?.incision || ""
           });
 
           // Checklist
@@ -572,7 +647,9 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
         invasionDetail: "",
         tumorMargin: "free",
         marginSize: "",
-        customMarginDetail: ""
+        customMarginDetail: "",
+        position: key === 'ramps' ? 'Supine' : (preset.position || ""),
+        incision: key === 'ramps' ? 'L incision' : (preset.incision || "")
       }));
     }
   };
@@ -609,7 +686,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       .filter(s => s.length > 0);
 
     // Save current steps in checklist
-    const procedures = checklist.map(c => c.text);
+    const procedures = checklist.map(c => c.templateText || c.text);
 
     try {
       const { data, error } = await supabase
@@ -647,12 +724,12 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
   };
 
   const handleUpdateTemplate = async () => {
-    const isUserTpl = !['open_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole'].includes(selectedOpKey);
+    const isUserTpl = !['open_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole', 'ramps'].includes(selectedOpKey);
     if (!isUserTpl) return;
 
     if (!confirm("Are you sure you want to update this template with current form steps and procedure name?")) return;
 
-    const procedures = checklist.map(c => c.text);
+    const procedures = checklist.map(c => c.templateText || c.text);
 
     try {
       const { error } = await supabase
@@ -674,7 +751,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
   };
 
   const handleDeleteTemplate = async () => {
-    const isUserTpl = !['open_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole'].includes(selectedOpKey);
+    const isUserTpl = !['open_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole', 'ramps'].includes(selectedOpKey);
     if (!isUserTpl) return;
 
     if (!confirm("Are you sure you want to delete this template? Operative notes using this template will not be affected.")) return;
@@ -794,7 +871,12 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
   const handleTextChange = (id: number, newText: string) => {
     setChecklist(prev => prev.map(item => 
-      item.id === id ? { ...item, text: newText } : item
+      item.id === id ? { 
+        ...item, 
+        text: newText,
+        templateText: newText,
+        selections: {}
+      } : item
     ));
   };
 
@@ -884,6 +966,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       return;
     }
     setActiveTab(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const moveChecklistItem = (index: number, direction: 'up' | 'down') => {
@@ -1066,7 +1149,9 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           invasionDetail: formData.invasionDetail,
           tumorMargin: formData.tumorMargin,
           marginSize: formData.marginSize,
-          customMarginDetail: formData.customMarginDetail
+          customMarginDetail: formData.customMarginDetail,
+          position: formData.position || '',
+          incision: formData.incision || ''
         },
         checklist: checklist,
         ebl: formData.ebl,
@@ -1436,12 +1521,14 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                   value={selectedOpKey} 
                   onChange={(e) => handleOpChange(e.target.value)}
                   className="w-full bg-blue-50 border border-blue-300 text-blue-900 font-semibold rounded-lg p-3 text-base focus:ring-2 focus:ring-blue-500">
+                  <option value="" disabled>-- เลือกประเภทการผ่าตัด (Select Operation) --</option>
                   <optgroup label="Default Presets (เทมเพลตมาตรฐาน)">
                     <option value="open_hepatectomy">Open Hepatectomy</option>
                     <option value="lap_hepatectomy">Laparoscopic Hepatectomy</option>
-                    <option value="whipple">Whipple Operation</option>
+                    <option value="whipple">Whipple operation</option>
                     <option value="lap_lar">Laparoscopic LAR with anastomosis</option>
                     <option value="lap_chole">Laparoscopic Cholecystectomy</option>
+                    <option value="ramps">Distal Pancreatosplenectomy with RAMPS</option>
                   </optgroup>
                   {userTemplates.length > 0 && (
                     <optgroup label="My Templates (เทมเพลตของฉัน)">
@@ -1462,7 +1549,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     <span>Save as New Template (บันทึกเป็นเทมเพลตใหม่)</span>
                   </button>
 
-                  {!['open_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole'].includes(selectedOpKey) && (
+                  {selectedOpKey !== '' && !['open_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole', 'ramps'].includes(selectedOpKey) && (
                     <>
                       <button
                         type="button"
@@ -1507,7 +1594,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                   </span>
                 </div>
                 
-                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                <div className="space-y-2 md:max-h-[500px] md:overflow-y-auto pr-1">
                   {checklist.map((item, index) => {
                     const placeholders = getPlaceholders(item.templateText || item.text);
                     const isExpanded = expandedItemId === item.id;
@@ -1619,7 +1706,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                           </div>
 
                           {/* Expanded Options Panel */}
-                          {isExpanded && item.checked && placeholders.length > 0 && (
+                          {(isExpanded || placeholders.length > 0) && item.checked && placeholders.length > 0 && (
                             <div className="no-toggle mt-3 pt-3 border-t border-gray-100 space-y-3 text-xs bg-gray-50/50 p-2.5 rounded-lg">
                               {placeholders.map((ph, phIdx) => {
                                 const options = ph.content.split(/[\/|]/).map(o => o.trim());
@@ -2191,6 +2278,63 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                   </div>
                 )}
 
+                {/* Incision and Position selection for RAMPS */}
+                {selectedOpKey === 'ramps' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-700 block">Incision (แนวแผล):</label>
+                      <div className="flex flex-col space-y-2">
+                        <label className="inline-flex items-center cursor-pointer">
+                          <input 
+                            type="radio" 
+                            name="ramps_incision" 
+                            checked={formData.incision === 'L incision' || formData.incision === ''} 
+                            onChange={() => setFormData({...formData, incision: 'L incision'})}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                          <span className="ml-2 text-xs font-medium text-gray-750">L incision (Default)</span>
+                        </label>
+                        <label className="inline-flex items-center cursor-pointer">
+                          <input 
+                            type="radio" 
+                            name="ramps_incision" 
+                            checked={formData.incision === 'Bilateral subcostal (Chevron) incision'} 
+                            onChange={() => setFormData({...formData, incision: 'Bilateral subcostal (Chevron) incision'})}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                          <span className="ml-2 text-xs font-medium text-gray-750">Bilateral subcostal (Chevron) incision</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-700 block">Position (ท่าผู้ป่วย):</label>
+                      <div className="flex flex-col space-y-2">
+                        <label className="inline-flex items-center cursor-pointer">
+                          <input 
+                            type="radio" 
+                            name="ramps_position" 
+                            checked={formData.position === 'Supine' || formData.position === ''} 
+                            onChange={() => setFormData({...formData, position: 'Supine'})}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                          <span className="ml-2 text-xs font-medium text-gray-750">Supine (Default)</span>
+                        </label>
+                        <label className="inline-flex items-center cursor-pointer">
+                          <input 
+                            type="radio" 
+                            name="ramps_position" 
+                            checked={formData.position === 'Reverse Trendelenburg with right lateral tilt'} 
+                            onChange={() => setFormData({...formData, position: 'Reverse Trendelenburg with right lateral tilt'})}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                          <span className="ml-2 text-xs font-medium text-gray-750">Reverse Trendelenburg with right lateral tilt</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Additional Text Findings */}
                 <div>
                   <label className="text-xs font-bold text-gray-700 block mb-1">Additional Text Findings (ข้อความตรวจพบเพิ่มเติม):</label>
@@ -2291,20 +2435,68 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Complication (ภาวะแทรกซ้อน)</label>
-                    <input 
-                      type="text" 
-                      value={formData.complication} 
-                      onChange={e => setFormData({...formData, complication: e.target.value})} 
-                      className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    <label className="block text-xs font-semibold text-gray-500 mb-2">Complication (ภาวะแทรกซ้อน)</label>
+                    <div className="flex items-center space-x-4 mb-2">
+                      <label className="flex items-center text-sm cursor-pointer">
+                        <input 
+                          type="radio" 
+                          checked={!formData.complication || formData.complication === 'No' || formData.complication === 'no' || formData.complication === 'None'} 
+                          onChange={() => setFormData({...formData, complication: 'No'})}
+                          className="mr-2 w-4 h-4 text-blue-600 focus:ring-blue-500"
+                        />
+                        No
+                      </label>
+                      <label className="flex items-center text-sm cursor-pointer">
+                        <input 
+                          type="radio" 
+                          checked={!!formData.complication && formData.complication !== 'No' && formData.complication !== 'no' && formData.complication !== 'None'} 
+                          onChange={() => setFormData({...formData, complication: 'Other'})}
+                          className="mr-2 w-4 h-4 text-blue-600 focus:ring-blue-500"
+                        />
+                        Yes
+                      </label>
+                    </div>
+                    {!!formData.complication && formData.complication !== 'No' && formData.complication !== 'no' && formData.complication !== 'None' && (
+                      <input 
+                        type="text" 
+                        placeholder="Please fill complication details..."
+                        value={formData.complication === 'Other' ? '' : formData.complication} 
+                        onChange={e => setFormData({...formData, complication: e.target.value})} 
+                        className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mt-1"
+                      />
+                    )}
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Specimen for Patho (สิ่งส่งตรวจทางพยาธิวิทยา)</label>
+                  <label className="block text-xs font-semibold text-gray-500 mb-2">Specimen for Patho (สิ่งส่งตรวจทางพยาธิวิทยา)</label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                    {["Right lobe liver", "Left lobe liver", "Whipple specimen", "Gall bladder", "Lymph node gr8", "Lymph node gr12", "Lymph node gr13"].map(item => (
+                      <label key={item} className="flex items-center text-sm cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={(formData.patho || '').includes(item)}
+                          onChange={e => {
+                            let current = formData.patho || "";
+                            if (e.target.checked) {
+                              if (!current.includes(item)) {
+                                setFormData({...formData, patho: current ? `${current}, ${item}` : item});
+                              }
+                            } else {
+                              let updated = current.replace(item, "").replace(/,\s*,/g, ",").replace(/^,\s*/, "").replace(/,\s*$/, "").trim();
+                              if (updated === ",") updated = "";
+                              setFormData({...formData, patho: updated});
+                            }
+                          }}
+                          className="mr-2 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        />
+                        {item}
+                      </label>
+                    ))}
+                  </div>
                   <input 
                     type="text" 
+                    placeholder="Other specimen / Additional details..."
                     value={formData.patho} 
                     onChange={e => setFormData({...formData, patho: e.target.value})} 
                     className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2455,8 +2647,8 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                 
                 {/* Left Column - Findings (5 cols) */}
                 <div className="col-span-5 space-y-2 pr-2 border-r border-gray-300 min-h-[460px] text-xs">
-                  <div><strong>Position:</strong> {currentPreset.position}</div>
-                  <div><strong>Incision:</strong> {currentPreset.incision}</div>
+                  <div><strong>Position:</strong> {formData.position || currentPreset.position}</div>
+                  <div><strong>Incision:</strong> {formData.incision || currentPreset.incision}</div>
 
                   {currentPreset.icg_flr && (
                     <div>
