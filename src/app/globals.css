@@ -59,23 +59,23 @@ body {
     box-shadow: none !important;
     margin: 0 !important;
     width: 100% !important; /* Full width of printable area */
-    max-height: 270mm !important; /* Force to fit A4 height safely on desktop and mobile */
-    min-height: 270mm !important;
-    height: 270mm !important; /* Force exact container height */
+    max-height: 100% !important;
+    min-height: 100% !important;
+    height: 100% !important; /* Dynamically match exactly the print page viewport height */
     padding: 0 !important; /* Margin handled by @page */
-    font-size: 11px !important; /* Restored to clear, readable 11px */
+    font-size: 11px !important; /* Clear, readable 11px */
     line-height: 1.25 !important;
-    display: flex !important;
+    display: flex !important; /* Flexbox layout to allow margin-top: auto */
     flex-direction: column !important;
-    justify-content: space-between !important; /* Push footer to the bottom */
-    overflow: hidden !important;
+    justify-content: space-between !important; /* Push footer exactly to the bottom */
+    overflow: hidden !important; /* Prevent extra pages */
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     box-sizing: border-box !important;
   }
-  /* Footer: positioned at the bottom of the A4 page using flex margin-top: auto */
+  /* Footer: positioned at the bottom of the page container */
   .a4-footer {
-    margin-top: auto !important;
+    margin-top: auto !important; /* Push to the very bottom using flexbox layout */
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }

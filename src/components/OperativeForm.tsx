@@ -249,6 +249,9 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
   const [loading, setLoading] = useState(!!noteId);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string>('');
   const [selectedPortSize, setSelectedPortSize] = useState<'5mm' | '10mm' | '12mm'>('10mm');
 
   // A4 Preview Scale States for mobile screens
@@ -1196,6 +1199,93 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (generatingPdf) return;
+    setGeneratingPdf(true);
+
+    try {
+      // 1. Dynamic imports of html-to-image and jspdf to avoid SSR issues
+      const { toPng } = await import('html-to-image');
+      const { jsPDF } = await import('jspdf');
+
+      // 2. Select the A4 preview element
+      const element = document.querySelector('.a4-page') as HTMLElement;
+      if (!element) {
+        alert('Preview element not found.');
+        setGeneratingPdf(false);
+        return;
+      }
+
+      // 3. Save original inline styles to restore later
+      const originalStyle = element.getAttribute('style') || '';
+      
+      // 4. Force specific inline styles to ensure high quality A4 layout capture (794px width, 1123px height)
+      element.style.width = '794px';
+      element.style.height = '1123px';
+      element.style.maxHeight = '1123px';
+      element.style.minHeight = '1123px';
+      element.style.transform = 'none';
+      element.style.margin = '0';
+      element.style.padding = '30px 45px 22px 45px'; // Matches A4 scale padding
+      element.style.boxSizing = 'border-box';
+      element.style.position = 'relative';
+
+      // Temporarily override footer style if absolutely positioned
+      const footerElement = element.querySelector('.a4-footer') as HTMLElement;
+      let originalFooterStyle = '';
+      if (footerElement) {
+        originalFooterStyle = footerElement.getAttribute('style') || '';
+        footerElement.style.position = 'absolute';
+        footerElement.style.bottom = '22px';
+        footerElement.style.left = '45px';
+        footerElement.style.right = '45px';
+      }
+
+      // 5. Run html-to-image
+      // html-to-image renders exact browser DOM including CSS Grid and Flexbox via SVG foreignObject,
+      // avoiding layout and text-overlapping bugs present in html2canvas.
+      const imgData = await toPng(element, {
+        pixelRatio: 2, // Equivalent to scale: 2 for high-resolution prints
+        skipFonts: false, // Preserve fonts
+      });
+
+      // 6. Restore original styles
+      element.setAttribute('style', originalStyle);
+      if (footerElement) {
+        footerElement.setAttribute('style', originalFooterStyle);
+      }
+
+      // 7. Create jsPDF and generate Blob URL
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, 210, 297);
+      
+      const pdfBlob = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      
+      // Revoke older URL to avoid memory leak
+      if (pdfUrl) {
+        try {
+          URL.revokeObjectURL(pdfUrl);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      
+      setPdfUrl(blobUrl);
+      setIsPdfModalOpen(true);
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen space-y-2">
@@ -1240,10 +1330,15 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
         <div className="flex items-center space-x-2">
           {activeTab === 'preview' && (
             <button 
-              onClick={() => window.print()} 
-              className="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow flex items-center space-x-1 transition">
-              <Printer className="h-3.5 w-3.5" />
-              <span>Print / PDF</span>
+              onClick={handleDownloadPDF} 
+              disabled={generatingPdf}
+              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow flex items-center space-x-1 transition">
+              {generatingPdf ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <FileText className="h-3.5 w-3.5" />
+              )}
+              <span>{generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง pdf file'}</span>
             </button>
           )}
           <button 
@@ -2527,7 +2622,33 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
         {/* TAB 5: PREVIEW TAB (Strictly Matched to Hospital Form Layout) */}
         <div className={activeTab === 'preview' ? 'block' : 'hidden no-print'}>
-          <div className="no-print mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-center bg-blue-50 border border-blue-200 p-4 rounded-xl gap-3">
+          {pdfUrl ? (
+            <div className="flex flex-col space-y-4 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-blue-50 p-4 rounded-xl border border-blue-200 gap-3">
+                <div className="text-sm font-semibold text-blue-900">PDF Ready to Print / Download</div>
+                <div className="flex space-x-2">
+                  <button 
+                    onClick={() => { URL.revokeObjectURL(pdfUrl); setPdfUrl(''); }} 
+                    className="bg-white border border-blue-300 hover:bg-blue-50 text-blue-700 font-semibold px-4 py-2 rounded-lg text-sm transition flex items-center shadow-sm"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-1.5" />
+                    กลับไปหน้าพรีวิว HTML
+                  </button>
+                  <a 
+                    href={pdfUrl} 
+                    download={`Operative_Note_${formData.patientName || formData.hn || 'Patient'}.pdf`} 
+                    className="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded-lg text-sm shadow transition flex items-center"
+                  >
+                    <Save className="h-4 w-4 mr-1.5" />
+                    ดาวน์โหลดไฟล์ PDF
+                  </a>
+                </div>
+              </div>
+              <iframe src={pdfUrl} className="w-full h-[85vh] rounded-xl shadow-lg border border-gray-300 bg-gray-100" title="PDF Viewer"></iframe>
+            </div>
+          ) : (
+            <>
+              <div className="no-print mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-center bg-blue-50 border border-blue-200 p-4 rounded-xl gap-3">
             <div className="flex items-center space-x-2 flex-wrap gap-2">
               <button 
                 onClick={() => handleTabClick('summary')}
@@ -2909,6 +3030,8 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
 
