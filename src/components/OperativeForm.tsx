@@ -24,8 +24,10 @@ import {
   ArrowDown,
   Maximize2,
   Minimize2,
-  GripVertical
+  GripVertical,
+  Crop
 } from 'lucide-react';
+import ImageCropModal from '@/components/ImageCropModal';
 
 type OpKey = 'open_hepatectomy' | 'lap_hepatectomy' | 'whipple' | 'lap_lar' | 'lap_chole' | 'ramps';
 
@@ -254,6 +256,11 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
   const [pdfUrl, setPdfUrl] = useState<string>('');
   const [selectedPortSize, setSelectedPortSize] = useState<'5mm' | '10mm' | '12mm'>('10mm');
 
+  // Image Crop & Rotate States
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropQueue, setCropQueue] = useState<{ src: string; editIndex?: number }[]>([]);
+  const [currentCropIndex, setCurrentCropIndex] = useState(0);
+
   // A4 Preview Scale States for mobile screens
   const [scale, setScale] = useState(1);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -310,6 +317,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
   // [P2] Progressive disclosure - advanced findings
   const [showAdvancedFindings, setShowAdvancedFindings] = useState(false);
+  const [isSameDiagnosis, setIsSameDiagnosis] = useState(false);
 
   // Form Fields
   const [formData, setFormData] = useState({
@@ -780,45 +788,106 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     }
   };
 
-  // Photo Uploader to Supabase Storage
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Photo Selection & Cropper Handlers
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    const fileList = Array.from(files);
+    const newQueue: { src: string }[] = [];
+    let readCount = 0;
+
+    fileList.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          newQueue.push({ src: event.target.result as string });
+        }
+        readCount++;
+        if (readCount === fileList.length) {
+          setCropQueue(newQueue);
+          setCurrentCropIndex(0);
+          setCropModalOpen(true);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = '';
+  };
+
+  const handleEditExistingPhoto = (index: number) => {
+    const photoUrl = formData.photos[index];
+    if (!photoUrl) return;
+    setCropQueue([{ src: photoUrl, editIndex: index }]);
+    setCurrentCropIndex(0);
+    setCropModalOpen(true);
+  };
+
+  const handleCropSave = async (croppedBlob: Blob) => {
     setUploading(true);
     try {
-      const uploadedUrls: string[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const fileExt = file.name.split('.').pop() || 'jpg';
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        
-        const { data, error } = await supabase.storage
-          .from('operative-photos')
-          .upload(fileName, file, {
-            cacheControl: '3600',
-            upsert: false
-          });
+      const currentItem = cropQueue[currentCropIndex];
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
 
-        if (error) throw error;
+      const { data, error } = await supabase.storage
+        .from('operative-photos')
+        .upload(fileName, croppedBlob, {
+          contentType: 'image/jpeg',
+          cacheControl: '3600',
+          upsert: false,
+        });
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('operative-photos')
-          .getPublicUrl(fileName);
+      if (error) throw error;
 
-        uploadedUrls.push(publicUrl);
+      const { data: { publicUrl } } = supabase.storage
+        .from('operative-photos')
+        .getPublicUrl(fileName);
+
+      if (currentItem.editIndex !== undefined) {
+        const editIdx = currentItem.editIndex;
+        setFormData((prev) => ({
+          ...prev,
+          photos: prev.photos.map((p, i) => (i === editIdx ? publicUrl : p)),
+        }));
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          photos: [...prev.photos, publicUrl],
+        }));
       }
 
-      setFormData(prev => ({
-        ...prev,
-        photos: [...prev.photos, ...uploadedUrls]
-      }));
+      setIsDirty(true);
+
+      if (currentCropIndex + 1 < cropQueue.length) {
+        setCurrentCropIndex((prev) => prev + 1);
+      } else {
+        setCropModalOpen(false);
+        setCropQueue([]);
+        setCurrentCropIndex(0);
+      }
     } catch (err) {
-      console.error('Error uploading image:', err);
-      alert('Failed to upload image. Please try again.');
+      console.error('Error uploading cropped image:', err);
+      showToast('Failed to upload image. Please try again.', 'error');
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleCropSkip = () => {
+    if (currentCropIndex + 1 < cropQueue.length) {
+      setCurrentCropIndex((prev) => prev + 1);
+    } else {
+      setCropModalOpen(false);
+      setCropQueue([]);
+      setCurrentCropIndex(0);
+    }
+  };
+
+  const handleCropClose = () => {
+    setCropModalOpen(false);
+    setCropQueue([]);
+    setCurrentCropIndex(0);
   };
 
   const removePhoto = async (index: number) => {
@@ -1247,6 +1316,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       const imgData = await toPng(element, {
         pixelRatio: 2, // Equivalent to scale: 2 for high-resolution prints
         skipFonts: false, // Preserve fonts
+        cacheBust: true, // Fixes missing images bug on iOS/Safari due to aggressive WebKit caching
       });
 
       // 6. Restore original styles
@@ -1578,16 +1648,43 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     <input 
                       type="text" 
                       value={formData.clinicalDiagnosis} 
-                      onChange={e => setFormData({...formData, clinicalDiagnosis: e.target.value})} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({
+                          ...prev, 
+                          clinicalDiagnosis: val,
+                          ...(isSameDiagnosis ? { postOpDiagnosis: val } : {})
+                        }));
+                      }} 
                       className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Post-operative Diagnosis (การวินิจฉัยหลังผ่าตัด)</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-gray-500">Post-operative Diagnosis (การวินิจฉัยหลังผ่าตัด)</label>
+                      <label className="flex items-center space-x-1 text-xs text-gray-600 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={isSameDiagnosis}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setIsSameDiagnosis(checked);
+                            if (checked) {
+                              setFormData(prev => ({...prev, postOpDiagnosis: prev.clinicalDiagnosis}));
+                            }
+                          }}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3 w-3"
+                        />
+                        <span>Same as Pre-op</span>
+                      </label>
+                    </div>
                     <input 
                       type="text" 
                       value={formData.postOpDiagnosis} 
-                      onChange={e => setFormData({...formData, postOpDiagnosis: e.target.value})} 
+                      onChange={e => {
+                        setFormData({...formData, postOpDiagnosis: e.target.value});
+                        if (isSameDiagnosis) setIsSameDiagnosis(false);
+                      }} 
                       className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -2460,7 +2557,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     type="file" 
                     accept="image/*" 
                     multiple
-                    onChange={handlePhotoUpload} 
+                    onChange={handlePhotoSelect} 
                     className="hidden" 
                     id="camera-photo-upload"
                   />
@@ -2472,7 +2569,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     ) : (
                       <Camera className="h-5 w-5" />
                     )}
-                    <span>{uploading ? 'Uploading finding photos...' : 'Take Photo / Upload Image'}</span>
+                    <span>{uploading ? 'Processing photos...' : 'Take Photo / Upload Image'}</span>
                   </label>
                 </div>
 
@@ -2482,13 +2579,23 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     {formData.photos.map((img, idx) => (
                       <div key={idx} className="relative group rounded-xl overflow-hidden border border-gray-200 aspect-square bg-gray-100 shadow-sm">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img} alt={`Finding photo ${idx + 1}`} className="w-full h-full object-cover"/>
-                        <button 
-                          type="button"
-                          onClick={() => removePhoto(idx)}
-                          className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs shadow-md transition">
-                          <X className="h-4 w-4" />
-                        </button>
+                        <img crossOrigin="anonymous" src={img} alt={`Finding photo ${idx + 1}`} className="w-full h-full object-cover"/>
+                        <div className="absolute top-1.5 right-1.5 flex items-center space-x-1.5">
+                          <button 
+                            type="button"
+                            onClick={() => handleEditExistingPhoto(idx)}
+                            title="Rotate or Crop Photo (หมุน/ตัดรูปภาพ)"
+                            className="bg-blue-600 hover:bg-blue-700 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs shadow-md transition cursor-pointer">
+                            <Crop className="h-3.5 w-3.5" />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => removePhoto(idx)}
+                            title="Delete Photo (ลบรูปภาพ)"
+                            className="bg-red-600 hover:bg-red-700 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs shadow-md transition cursor-pointer">
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2568,7 +2675,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-2">Specimen for Patho (สิ่งส่งตรวจทางพยาธิวิทยา)</label>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-                    {["Right lobe liver", "Left lobe liver", "Whipple specimen", "Gall bladder", "Lymph node gr8", "Lymph node gr12", "Lymph node gr13"].map(item => (
+                    {["Right lobe liver", "Left lobe liver", "Whipple specimen", "Gall bladder", "Distal pancreas", "Spleen", "Lymph node gr8", "Lymph node gr12", "Lymph node gr13"].map(item => (
                       <label key={item} className="flex items-center text-sm cursor-pointer">
                         <input 
                           type="checkbox" 
@@ -2796,7 +2903,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                           <div className="font-bold text-[9px] mb-0.5 text-gray-700">Laparoscopic Ports:</div>
                           <div className="relative w-28 h-[120px] bg-white overflow-hidden rounded border border-gray-100 a4-ports-container">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img 
+                            <img crossOrigin="anonymous" 
                               src="/abdomen.jpg" 
                               alt="Abdomen outline" 
                               className="absolute inset-0 w-full h-full object-contain pointer-events-none print-abdomen-bg" 
@@ -2825,7 +2932,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                               {formData.photos.slice(0, 2).map((img, i) => (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <div key={i} className="relative w-full h-full min-h-[120px] bg-gray-50 rounded overflow-hidden a4-photo-container">
-                                  <img 
+                                  <img crossOrigin="anonymous" 
                                     src={img} 
                                     alt={`Finding photo ${i+1}`} 
                                     className="absolute inset-0 w-full h-full object-cover specimen-print-photo"
@@ -2867,7 +2974,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                           {formData.photos.slice(2, 4).map((img, i) => (
                             // eslint-disable-next-line @next/next/no-img-element
                             <div key={i} className="relative w-full h-[110px] bg-gray-50 rounded overflow-hidden a4-photo-container">
-                              <img 
+                              <img crossOrigin="anonymous" 
                                 src={img} 
                                 alt={`Finding photo ${i+3}`} 
                                 className="absolute inset-0 w-full h-full object-cover specimen-print-photo"
@@ -2911,7 +3018,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                             {formData.photos.slice(0, 4).map((img, i) => (
                               // eslint-disable-next-line @next/next/no-img-element
                               <div key={i} className="relative w-full h-[110px] bg-gray-50 rounded overflow-hidden a4-photo-container">
-                                <img 
+                                <img crossOrigin="anonymous" 
                                   src={img} 
                                   alt={`Finding photo ${i+1}`} 
                                   className="absolute inset-0 w-full h-full object-cover specimen-print-photo"
@@ -3175,6 +3282,19 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
             </div>
           </div>
         </div>
+      )}
+
+      {/* Image Crop & Rotate Modal */}
+      {cropQueue.length > 0 && (
+        <ImageCropModal
+          isOpen={cropModalOpen}
+          imageSrc={cropQueue[currentCropIndex]?.src || ''}
+          onClose={handleCropClose}
+          onCropSave={handleCropSave}
+          currentIndex={currentCropIndex + 1}
+          totalCount={cropQueue.length}
+          onSkip={cropQueue.length > 1 ? handleCropSkip : undefined}
+        />
       )}
     </div>
   );
