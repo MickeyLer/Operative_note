@@ -25,9 +25,12 @@ import {
   Maximize2,
   Minimize2,
   GripVertical,
-  Crop
+  Crop,
+  Sparkles,
+  Scan
 } from 'lucide-react';
 import ImageCropModal from '@/components/ImageCropModal';
+import { scanPatientSticker } from '@/lib/patientStickerScanner';
 
 type OpKey = 'open_hepatectomy' | 'lap_hepatectomy' | 'whipple' | 'lap_lar' | 'lap_chole' | 'ramps';
 
@@ -77,7 +80,7 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "A Roux-en-Y hepaticojejunostomy was constructed using <5-0 PDS/4-0 PDS/4-0 vicryl/4-0 monocryl> sutures.",
       "Hemostasis was verified and secured.",
       "JP drains were placed in the <subhepatic and right subphrenic/subhepatic/right subphrenic> spaces.",
-      "The abdomen was closed in layers using a <PDS loop/Monocryl/Prolene> suture, and the skin was approximated with <staples/nylon/subcuticular monocryl>."
+      "The abdomen was closed in layers using a <Vicryl/PDS loop/Monocryl/Prolene> suture, and the skin was approximated with <staples/nylon/subcuticular monocryl>."
     ]
   },
   lap_hepatectomy: {
@@ -119,12 +122,13 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "The proximal jejunum was divided using a GIA stapler.",
       "Finally, the uncinate process was dissected from the SMV and PV.",
       "Hemostasis was verified and secured.",
-      "Pancreaticojejunostomy (PJ) anastomosis was constructed using the modified Blumgart technique (duct-to-mucosa) with <5-0 PDS/4-0 PDS/5-0 Prolene> sutures.",
-      "Hepaticojejunostomy (HJ) anastomosis was constructed using <4-0 Monocryl/5-0 Monocryl/4-0 PDS> sutures (interrupted or continuous).",
-      "Gastrojejunostomy (GJ) and jejunojejunostomy (JJ) anastomoses were constructed using <3-0 Monocryl/4-0 Monocryl/3-0 Vicryl> sutures.",
+      "Pancreaticojejunostomy (PJ) anastomosis was constructed using the modified Blumgart technique (duct-to-mucosa) with <5-0 PDS/4-0 PDS/5-0 Prolene> sutures (<12 stitch/10 stitch/8 stitch/14 stitch/16 stitch>).",
+      "Hepaticojejunostomy (HJ) anastomosis was constructed using <4-0 Monocryl/5-0 Monocryl/4-0 PDS/4-0 Vicryl> sutures (<continuous/interrupted>).",
+      "Gastrojejunostomy (GJ) anastomosis was constructed using <3-0 Monocryl/4-0 Monocryl/3-0 Vicryl/GIA stapler> sutures.",
+      "Jejunojejunostomy (JJ) anastomosis was constructed using <3-0 Monocryl/4-0 Monocryl/3-0 Vicryl> sutures.",
       "A feeding jejunostomy was performed.",
-      "JP drains were placed in the <subhepatic and right subphrenic/subhepatic/right subphrenic> spaces.",
-      "The abdomen was closed in layers using a <PDS loop/Prolene/Monocryl> suture, and the skin was approximated with <staples/nylon>."
+      "JP drains were placed in the <subhepatic and left subphrenic/subhepatic and right subphrenic/subhepatic/right subphrenic/left subphrenic> spaces.",
+      "The abdomen was closed in layers using a <Vicryl/PDS loop/Prolene/Monocryl> suture, and the skin was approximated with <staples/nylon>."
     ]
   },
   lap_lar: {
@@ -192,7 +196,7 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "The specimen, consisting of the distal pancreas, spleen, and regional lymph nodes, was removed en bloc.",
       "Hemostasis was verified and secured.",
       "A JP drain was placed in the left subdiaphragmatic space / pancreatic bed.",
-      "The abdomen was closed in layers using a PDS loop suture, and the skin was approximated with staples."
+      "The abdomen was closed in layers using a <Vicryl/PDS loop/Prolene/Monocryl> suture, and the skin was approximated with <staples/nylon>."
     ]
   }
 };
@@ -357,6 +361,10 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     tumorMargin: "free",
     marginSize: "",
     customMarginDetail: "",
+    selectedWhippleLocations: [] as string[],
+    customWhippleLocation: "",
+    selectedWhippleMargins: [] as string[],
+    customWhippleMargin: "",
     
     // Summary
     ebl: "",
@@ -418,6 +426,63 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       document.removeEventListener('touchstart', handleOutsideClick);
     };
   }, [swipedItemId]);
+
+  // AI Sticker Scanner State & Handlers
+  const [isScanningSticker, setIsScanningSticker] = useState(false);
+  const [stickerScanProgress, setStickerScanProgress] = useState<string>('');
+  const [stickerScanSuccess, setStickerScanSuccess] = useState<string | null>(null);
+  const [stickerScanError, setStickerScanError] = useState<string | null>(null);
+  const stickerFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleStickerFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsScanningSticker(true);
+    setStickerScanProgress('กำลังเตรียมรูปภาพ...');
+    setStickerScanSuccess(null);
+    setStickerScanError(null);
+
+    try {
+      const result = await scanPatientSticker(file, (_progress, message) => {
+        setStickerScanProgress(message);
+      });
+
+      if (result.success && result.data) {
+        const { patientName, hn, an, ward, patientAge } = result.data;
+
+        setFormData(prev => ({
+          ...prev,
+          patientName: patientName || prev.patientName,
+          hn: hn || prev.hn,
+          an: an || prev.an,
+          ward: ward || prev.ward,
+          patientAge: patientAge || prev.patientAge
+        }));
+
+        const filledFields = [];
+        if (patientName) filledFields.push('ชื่อ');
+        if (hn) filledFields.push('HN');
+        if (an) filledFields.push('AN');
+        if (ward) filledFields.push('Ward');
+        if (patientAge) filledFields.push('อายุ');
+
+        setStickerScanSuccess(`ดึงข้อมูลสำเร็จ: ${filledFields.join(', ')}`);
+        setTimeout(() => setStickerScanSuccess(null), 6000);
+      } else {
+        setStickerScanError(result.error || 'ไม่สามารถสแกนข้อมูลจากรูปภาพได้');
+        setTimeout(() => setStickerScanError(null), 6000);
+      }
+    } catch (err: any) {
+      setStickerScanError(err.message || 'เกิดข้อผิดพลาดในการสแกนสติ๊กเกอร์');
+      setTimeout(() => setStickerScanError(null), 6000);
+    } finally {
+      setIsScanningSticker(false);
+      if (e.target) {
+        e.target.value = '';
+      }
+    }
+  };
 
 
 
@@ -592,6 +657,10 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
             tumorMargin: data.findings.tumorMargin || 'free',
             marginSize: data.findings.marginSize || '',
             customMarginDetail: data.findings.customMarginDetail || '',
+            selectedWhippleLocations: data.findings.selectedWhippleLocations || [],
+            customWhippleLocation: data.findings.customWhippleLocation || '',
+            selectedWhippleMargins: data.findings.selectedWhippleMargins || [],
+            customWhippleMargin: data.findings.customWhippleMargin || '',
             
             // Summary
             ebl: data.ebl,
@@ -659,6 +728,10 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
         tumorMargin: "free",
         marginSize: "",
         customMarginDetail: "",
+        selectedWhippleLocations: [],
+        customWhippleLocation: "",
+        selectedWhippleMargins: [],
+        customWhippleMargin: "",
         position: key === 'ramps' ? 'Supine' : (preset.position || ""),
         incision: key === 'ramps' ? 'L incision' : (preset.incision || "")
       }));
@@ -1224,6 +1297,10 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           tumorMargin: formData.tumorMargin,
           marginSize: formData.marginSize,
           customMarginDetail: formData.customMarginDetail,
+          selectedWhippleLocations: formData.selectedWhippleLocations || [],
+          customWhippleLocation: formData.customWhippleLocation || '',
+          selectedWhippleMargins: formData.selectedWhippleMargins || [],
+          customWhippleMargin: formData.customWhippleMargin || '',
           position: formData.position || '',
           incision: formData.incision || ''
         },
@@ -1464,10 +1541,56 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           {activeTab === 'info' && (
             <div className="space-y-4">
               <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 space-y-4">
-                <h2 className="font-bold text-gray-800 text-sm border-b pb-2 flex items-center text-blue-800">
-                  <User className="h-4.5 w-4.5 mr-2" />
-                  Patient Demographics (ข้อมูลผู้ป่วย)
-                </h2>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+                  <h2 className="font-bold text-gray-800 text-sm flex items-center text-blue-800">
+                    <User className="h-4.5 w-4.5 mr-2" />
+                    Patient Demographics (ข้อมูลผู้ป่วย)
+                  </h2>
+
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="file" 
+                      ref={stickerFileInputRef} 
+                      onChange={handleStickerFileChange} 
+                      accept="image/*" 
+                      capture="environment" 
+                      className="hidden" 
+                    />
+                    <button
+                      type="button"
+                      disabled={isScanningSticker}
+                      onClick={() => stickerFileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg shadow-xs transition-all disabled:opacity-60 cursor-pointer"
+                      title="ถ่ายรูปหรือเลือกรูปภาพสติ๊กเกอร์ป้ายชื่อผู้ป่วยเพื่อดึงข้อมูลด้วย AI"
+                    >
+                      {isScanningSticker ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>{stickerScanProgress || 'กำลังสแกน...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3.5 w-3.5" />
+                          <span>สแกนสติ๊กเกอร์ (AI Scan)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {stickerScanSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-lg flex items-center gap-2 animate-fadeIn">
+                    <Check className="h-4 w-4 flex-shrink-0 text-emerald-600" />
+                    <span>{stickerScanSuccess}</span>
+                  </div>
+                )}
+
+                {stickerScanError && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg flex items-center gap-2 animate-fadeIn">
+                    <X className="h-4 w-4 flex-shrink-0 text-red-600" />
+                    <span>{stickerScanError}</span>
+                  </div>
+                )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -2218,26 +2341,213 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                 )}
 
                 {currentPreset.pd_size && (
-                  <div className="grid grid-cols-2 gap-3 bg-blue-50/55 p-3 rounded-lg text-sm border border-blue-100">
-                    <div>
-                      <label className="block text-xs font-semibold text-blue-800 mb-1">PD size (mm)</label>
-                      <input 
-                        type="text" 
-                        value={formData.pdSize} 
-                        onChange={e => setFormData({...formData, pdSize: e.target.value})} 
-                        className="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                  <>
+                    <div className="grid grid-cols-2 gap-3 bg-blue-50/55 p-3 rounded-lg text-sm border border-blue-100">
+                      <div>
+                        <label className="block text-xs font-semibold text-blue-800 mb-1">PD size (mm)</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. 3"
+                          value={formData.pdSize} 
+                          onChange={e => setFormData({...formData, pdSize: e.target.value})} 
+                          className="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-blue-800 mb-1">Pancreatic consistency</label>
+                        <div className="flex gap-1 mb-1.5">
+                          {['soft', 'firm', 'hard'].map(c => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => setFormData({ ...formData, pancreaticConsistency: c })}
+                              className={`flex-1 py-1 px-1.5 text-xs font-semibold capitalize rounded-lg border text-center transition cursor-pointer select-none ${
+                                formData.pancreaticConsistency?.toLowerCase() === c
+                                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm font-bold'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              {c}
+                            </button>
+                          ))}
+                        </div>
+                        <input 
+                          type="text" 
+                          placeholder="Or type custom consistency..."
+                          value={formData.pancreaticConsistency} 
+                          onChange={e => setFormData({...formData, pancreaticConsistency: e.target.value})} 
+                          className="w-full bg-white border border-gray-300 rounded-lg p-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-blue-800 mb-1">Pancreatic consistency</label>
-                      <input 
-                        type="text" 
-                        value={formData.pancreaticConsistency} 
-                        onChange={e => setFormData({...formData, pancreaticConsistency: e.target.value})} 
-                        className="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+
+                    <div className="border border-blue-100 rounded-xl p-4 bg-blue-50/20 space-y-4">
+                      <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wider border-b pb-1.5 border-blue-200 flex items-center">
+                        <Activity className="h-4 w-4 text-blue-600 mr-1.5" />
+                        Tumor Findings (สิ่งตรวจพบเนื้องอก)
+                      </h3>
+                      
+                      <div>
+                        {/* Tumor Size */}
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">Tumor Size (cm):</label>
+                          <div className="flex items-center space-x-2">
+                            <input 
+                              type="text" 
+                              placeholder="e.g., 3 or 2.5x3"
+                              value={formData.tumorSize}
+                              onChange={e => setFormData({...formData, tumorSize: e.target.value})}
+                              className="w-full border border-gray-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium"
+                            />
+                            <span className="text-xs font-bold text-gray-500">cm</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tumor Location Selection */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1.5">Tumor Location (at ...):</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {['distal CBD', 'head of pancreas', 'ampulla', 'duodenum'].map(loc => {
+                            const isSelected = formData.selectedWhippleLocations?.includes(loc);
+                            return (
+                              <button
+                                key={loc}
+                                type="button"
+                                onClick={() => {
+                                  const prevLocs = formData.selectedWhippleLocations || [];
+                                  const nextLocs = isSelected 
+                                    ? prevLocs.filter(l => l !== loc)
+                                    : [...prevLocs, loc];
+                                  setFormData({...formData, selectedWhippleLocations: nextLocs});
+                                }}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition select-none cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm font-bold'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                {loc}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="mt-2">
+                          <label className="block text-[11px] font-semibold text-gray-500 mb-1">Other / Custom Location (รายละเอียดตำแหน่งเพิ่มเติม):</label>
+                          <input 
+                            type="text"
+                            placeholder="e.g. uncinate process, body..."
+                            value={formData.customWhippleLocation}
+                            onChange={e => setFormData({...formData, customWhippleLocation: e.target.value})}
+                            className="w-full border border-gray-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Free Margin Location Selection */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1.5">Free Margin (free ...):</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {['bile duct', 'duodenum', 'pancreas', 'all'].map(marginLoc => {
+                            const isSelected = formData.selectedWhippleMargins?.includes(marginLoc);
+                            return (
+                              <button
+                                key={marginLoc}
+                                type="button"
+                                onClick={() => {
+                                  const prevMargins = formData.selectedWhippleMargins || [];
+                                  const nextMargins = isSelected 
+                                    ? prevMargins.filter(m => m !== marginLoc)
+                                    : [...prevMargins, marginLoc];
+                                  setFormData({...formData, selectedWhippleMargins: nextMargins});
+                                }}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition select-none cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm font-bold'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                {marginLoc}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="mt-2">
+                          <label className="block text-[11px] font-semibold text-gray-500 mb-1">Other / Custom Margin detail (รายละเอียดขอบตัดเพิ่มเติม):</label>
+                          <input 
+                            type="text"
+                            placeholder="e.g. SMA margin, retroperitoneal margin..."
+                            value={formData.customWhippleMargin}
+                            onChange={e => setFormData({...formData, customWhippleMargin: e.target.value})}
+                            className="w-full border border-gray-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Invasion */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Invasion (การลุกลาม):</label>
+                        <div className="flex items-center space-x-4 mb-2">
+                          <label className="inline-flex items-center cursor-pointer text-xs font-semibold text-gray-700">
+                            <input 
+                              type="radio" 
+                              name="tumorInvasion" 
+                              checked={formData.tumorInvasion === 'No'} 
+                              onChange={() => setFormData({...formData, tumorInvasion: 'No'})}
+                              className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500 cursor-pointer mr-1"
+                            />
+                            No (ไม่มี)
+                          </label>
+                          <label className="inline-flex items-center cursor-pointer text-xs font-semibold text-gray-700">
+                            <input 
+                              type="radio" 
+                              name="tumorInvasion" 
+                              checked={formData.tumorInvasion === 'Yes'} 
+                              onChange={() => setFormData({...formData, tumorInvasion: 'Yes'})}
+                              className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500 cursor-pointer mr-1"
+                            />
+                            Yes (ลุกลาม)
+                          </label>
+                        </div>
+                        {formData.tumorInvasion === 'Yes' && (
+                          <div className="space-y-2 bg-white/50 p-2.5 rounded-lg border border-gray-250">
+                            <div className="flex flex-wrap gap-1">
+                              {['Portal vein', 'SMV', 'SMA', 'Duodenum', 'Stomach', 'Colon'].map(invTarget => {
+                                const currentInvDetails = formData.invasionDetail?.split(',').map(s => s.trim()).filter(Boolean) || [];
+                                const isSelected = currentInvDetails.includes(invTarget);
+                                return (
+                                  <button
+                                    key={invTarget}
+                                    type="button"
+                                    onClick={() => {
+                                      const nextDetails = isSelected
+                                        ? currentInvDetails.filter(d => d !== invTarget)
+                                        : [...currentInvDetails, invTarget];
+                                      setFormData({...formData, invasionDetail: nextDetails.join(', ')});
+                                    }}
+                                    className={`px-2 py-1 rounded border text-[11px] font-semibold transition cursor-pointer select-none ${
+                                      isSelected
+                                        ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
+                                        : 'bg-white text-gray-700 border-gray-250 hover:bg-gray-100'
+                                    }`}
+                                  >
+                                    {invTarget}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <input 
+                              type="text" 
+                              placeholder="Specify other invaded structures / details..." 
+                              value={formData.invasionDetail} 
+                              onChange={e => setFormData({...formData, invasionDetail: e.target.value})} 
+                              className="w-full border border-gray-300 rounded-lg p-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </>
                 )}
 
                 {/* Lymph Node Enlargement Selection Chips */}
@@ -2963,6 +3273,23 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                             }</span>
                           </p>
                         )}
+                        {currentPreset.pd_size && (
+                          <p className="text-black font-semibold mb-1 leading-relaxed bg-blue-50/10 p-1 rounded border border-dashed border-blue-200 text-xs">
+                            • Tumor size <span className="underline">{formData.tumorSize || '......'}</span> cm at <span className="underline">{(() => {
+                              const locs = formData.selectedWhippleLocations || [];
+                              const parts = [];
+                              if (locs.length > 0) parts.push(locs.join(', '));
+                              if (formData.customWhippleLocation) parts.push(formData.customWhippleLocation);
+                              return parts.join(' ') || '............';
+                            })()}</span>, free <span className="underline">{(() => {
+                              const margins = formData.selectedWhippleMargins || [];
+                              const parts = [];
+                              if (margins.length > 0) parts.push(margins.join(', '));
+                              if (formData.customWhippleMargin) parts.push(formData.customWhippleMargin);
+                              return parts.join(' ') || '............';
+                            })()}</span> margin, invade <span className="underline">{formData.tumorInvasion === 'Yes' ? formData.invasionDetail || 'yes' : 'no'}</span>
+                          </p>
+                        )}
                         {formData.findingTextNotes && (
                           <p className="whitespace-pre-line text-black font-semibold mt-0.5 bg-gray-50/50 p-1 rounded">{formData.findingTextNotes}</p>
                         )}
@@ -3004,6 +3331,23 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                               formData.tumorMargin === 'close' ? `close margin ${formData.marginSize || '.....'} cm` :
                               formData.customMarginDetail || 'free margin?'
                             }</span>
+                          </p>
+                        )}
+                        {currentPreset.pd_size && (
+                          <p className="text-black font-semibold mb-1 leading-relaxed bg-blue-50/10 p-1 rounded border border-dashed border-blue-200 text-xs">
+                            • Tumor size <span className="underline">{formData.tumorSize || '......'}</span> cm at <span className="underline">{(() => {
+                              const locs = formData.selectedWhippleLocations || [];
+                              const parts = [];
+                              if (locs.length > 0) parts.push(locs.join(', '));
+                              if (formData.customWhippleLocation) parts.push(formData.customWhippleLocation);
+                              return parts.join(' ') || '............';
+                            })()}</span>, free <span className="underline">{(() => {
+                              const margins = formData.selectedWhippleMargins || [];
+                              const parts = [];
+                              if (margins.length > 0) parts.push(margins.join(', '));
+                              if (formData.customWhippleMargin) parts.push(formData.customWhippleMargin);
+                              return parts.join(' ') || '............';
+                            })()}</span> margin, invade <span className="underline">{formData.tumorInvasion === 'Yes' ? formData.invasionDetail || 'yes' : 'no'}</span>
                           </p>
                         )}
                         {formData.findingTextNotes && (
