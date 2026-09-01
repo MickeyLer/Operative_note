@@ -30,7 +30,8 @@ import {
   Scan,
   ClipboardList,
   FileCheck,
-  Stethoscope
+  Stethoscope,
+  Edit2
 } from 'lucide-react';
 import ImageCropModal from '@/components/ImageCropModal';
 import { scanPatientSticker } from '@/lib/patientStickerScanner';
@@ -1139,10 +1140,6 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     .every(item => !item.text.includes('<') && !item.text.includes('>'));
 
   const handleTabClick = (tab: 'info' | 'checklist' | 'findings' | 'summary' | 'preview') => {
-    if (tab !== 'info' && tab !== 'findings' && tab !== 'checklist' && !isChecklistValid) {
-      alert('กรุณาเลือกตัวเลือกในขั้นตอนผ่าตัด (เช่น ชนิดของไหม หรือเครื่องมือ) ให้ครบถ้วนก่อนข้ามไปขั้นตอนถัดไป');
-      return;
-    }
     setActiveTab(tab);
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1540,9 +1537,9 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       </header>
 
       {/* Mobile-Native tab switcher (Hidden when printing) */}
-      <div className="bg-white border-b border-gray-200 flex no-print sticky top-[45px] sm:top-[48px] z-40 shadow-sm text-xs font-bold w-full">
+      <div className="bg-white border-b border-gray-200 flex no-print sticky top-[45px] sm:top-[48px] z-40 shadow-sm text-xs font-bold w-full overflow-x-auto scrollbar-hide">
         <button 
-          className={`mobile-tab-btn flex-1 min-w-0 py-2 sm:py-2.5 px-1 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'info' ? 'active' : 'text-gray-600'}`}
+          className={`mobile-tab-btn flex-none min-w-[72px] sm:min-w-[120px] py-2 sm:py-2.5 px-2 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'info' ? 'active' : 'text-gray-600'}`}
           onClick={() => handleTabClick('info')}
           title="1. Patient & Team">
           <User className="h-5 w-5 shrink-0" />
@@ -1550,7 +1547,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           <span className="text-[10px] font-semibold block md:hidden leading-none mt-1 truncate">Info</span>
         </button>
         <button 
-          className={`mobile-tab-btn flex-1 min-w-0 py-2 sm:py-2.5 px-1 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'findings' ? 'active' : 'text-gray-600'}`}
+          className={`mobile-tab-btn flex-none min-w-[72px] sm:min-w-[120px] py-2 sm:py-2.5 px-2 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'findings' ? 'active' : 'text-gray-600'}`}
           onClick={() => handleTabClick('findings')}
           title="2. Findings & Photos">
           <Stethoscope className="h-5 w-5 shrink-0" />
@@ -1558,15 +1555,23 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           <span className="text-[10px] font-semibold block md:hidden leading-none mt-1 truncate">Findings</span>
         </button>
         <button 
-          className={`mobile-tab-btn flex-1 min-w-0 py-2 sm:py-2.5 px-1 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'checklist' ? 'active' : 'text-gray-600'}`}
+          className={`relative mobile-tab-btn flex-none min-w-[72px] sm:min-w-[120px] py-2 sm:py-2.5 px-2 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'checklist' ? 'active' : 'text-gray-600'}`}
           onClick={() => handleTabClick('checklist')}
           title="3. Operation & Steps">
-          <ClipboardList className="h-5 w-5 shrink-0" />
+          <div className="relative">
+            <ClipboardList className="h-5 w-5 shrink-0" />
+            {!isChecklistValid && (
+              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+              </span>
+            )}
+          </div>
           <span className="hidden md:inline">3. Operation & Steps</span>
           <span className="text-[10px] font-semibold block md:hidden leading-none mt-1 truncate">Steps</span>
         </button>
         <button 
-          className={`mobile-tab-btn flex-1 min-w-0 py-2 sm:py-2.5 px-1 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'summary' ? 'active' : 'text-gray-600'}`}
+          className={`mobile-tab-btn flex-none min-w-[72px] sm:min-w-[120px] py-2 sm:py-2.5 px-2 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'summary' ? 'active' : 'text-gray-600'}`}
           onClick={() => handleTabClick('summary')}
           title="4. Summary">
           <FileCheck className="h-5 w-5 shrink-0" />
@@ -1574,7 +1579,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           <span className="text-[10px] font-semibold block md:hidden leading-none mt-1 truncate">Summary</span>
         </button>
         <button 
-          className={`mobile-tab-btn flex-1 min-w-0 py-2 sm:py-2.5 px-1 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'preview' ? 'active' : 'text-gray-600'}`}
+          className={`mobile-tab-btn flex-none min-w-[72px] sm:min-w-[120px] py-2 sm:py-2.5 px-2 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'preview' ? 'active' : 'text-gray-600'}`}
           onClick={() => handleTabClick('preview')}
           title="5. A4 Print Preview">
           <Printer className="h-5 w-5 shrink-0" />
