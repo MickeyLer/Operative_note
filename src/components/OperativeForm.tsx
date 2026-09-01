@@ -27,7 +27,10 @@ import {
   GripVertical,
   Crop,
   Sparkles,
-  Scan
+  Scan,
+  ClipboardList,
+  FileCheck,
+  Stethoscope
 } from 'lucide-react';
 import ImageCropModal from '@/components/ImageCropModal';
 import { scanPatientSticker } from '@/lib/patientStickerScanner';
@@ -74,7 +77,7 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "Resection of the distal common bile duct (CBD) was performed at its intrapancreatic portion.",
       "The vascular inflow vessels were individually ligated and divided.",
       "Mobilization of the liver was completed.",
-      "Parenchymal transection was performed using <CUSA/Thunderbeat/Harmonic/cautery> under <Pringle maneuver (clamping for 15 minutes, followed by a 5-minute release)/inflow occlusion>.",
+      "Parenchymal transection was performed using <CUSA/Thunderbeat/Harmonic/Ligasure/cautery> under <Pringle maneuver (clamping for 15 minutes, followed by a 5-minute release)/inflow occlusion>.",
       "The hepatic vein was divided using a <vascular stapler/Hem-o-lok clips/ligatures>.",
       "The proximal bile duct was divided with a margin of at least 1 cm from the tumor, and ductoplasty was performed.",
       "A Roux-en-Y hepaticojejunostomy was constructed using <5-0 PDS/4-0 PDS/4-0 vicryl/4-0 monocryl> sutures.",
@@ -90,16 +93,16 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
     icg_flr: true,
     ln_options: ["gr8", "gr12", "gr13"],
     procedures: [
-      "Pneumoperitoneum was established at 12 mmHg via the Veress needle or Hasson technique.",
+      "Pneumoperitoneum was established at 12 mmHg via the Hasson technique.",
       "Diagnostic laparoscopy and thorough abdominal cavity exploration were performed.",
       "Intraoperative ultrasound was used to localize the lesion and identify key vascular landmarks.",
       "A Glissonean approach or individual hilar dissection was performed.",
       "A laparoscopic Pringle maneuver <was prepared/was not required> for inflow control.",
-      "Laparoscopic parenchymal transection was carried out using <CUSA/Thunderbeat/Harmonic scalpel>.",
+      "Laparoscopic parenchymal transection was carried out using <CUSA/Thunderbeat/Harmonic scalpel/Ligasure>.",
       "Vascular and biliary structures were controlled using <Hem-o-lok clips/an Endo-GIA stapler/sutures>.",
       "The specimen was retrieved in an extraction bag (Endo-bag) via a <Pfannenstiel incision/mini-laparotomy>.",
       "Hemostasis was verified, and a drain was placed at the surgical bed.",
-      "The port sites were closed in layers."
+      "The port sites were closed in layers using a <Vicryl/PDS loop/Monocryl/Prolene> suture, and the skin was approximated with <staples/nylon/subcuticular monocryl>."
     ]
   },
   whipple: {
@@ -391,9 +394,9 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
   });
 
   // Procedure Checklist State
-  const [checklist, setChecklist] = useState<{ id: number; text: string; checked: boolean; templateText?: string; selections?: Record<number, string> }[]>([]);
+  const [checklist, setChecklist] = useState<{ id: number; text: string; checked: boolean; templateText?: string; selections?: Record<number, string[]> }[]>([]);
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
-  const [lastDeletedItem, setLastDeletedItem] = useState<{ item: { id: number; text: string; checked: boolean; templateText?: string; selections?: Record<number, string> }; index: number } | null>(null);
+  const [lastDeletedItem, setLastDeletedItem] = useState<{ item: { id: number; text: string; checked: boolean; templateText?: string; selections?: Record<number, string[]> }; index: number } | null>(null);
 
   // Drag and Drop State & Refs
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -541,13 +544,13 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     if (presetProcedures.length > 0) {
       setChecklist(presetProcedures.map((proc, idx) => {
         const regex = /<([^>]+)>/g;
-        const selections: Record<number, string> = {};
+        const selections: Record<number, string[]> = {};
         let phIndex = 0;
         
         const newText = proc.replace(regex, (match, content) => {
           const options = content.split(/[\/|]/).map((o: string) => o.trim());
           const defaultOpt = options[0]; // Set first option as default
-          selections[phIndex] = defaultOpt;
+          selections[phIndex] = [defaultOpt];
           phIndex++;
           return defaultOpt;
         });
@@ -1083,13 +1086,43 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       const placeholders = getPlaceholders(tplText);
       if (placeholders.length === 0) return item;
       
-      const newSelections = { ...(item.selections || {}), [placeholderIndex]: optionValue };
+      const rawSelection = item.selections?.[placeholderIndex];
+      const currentSelectionArray = Array.isArray(rawSelection) ? rawSelection : (rawSelection !== undefined ? [String(rawSelection)] : []);
+      const options = placeholders[placeholderIndex]?.content.split(/[\/|]/).map(o => o.trim()) || [];
+      
+      let nextSelectionArray: string[] = [...currentSelectionArray];
+      
+      // If the incoming value is one of the predefined options, we toggle it
+      if (options.includes(optionValue)) {
+        if (nextSelectionArray.includes(optionValue)) {
+          nextSelectionArray = nextSelectionArray.filter(v => v !== optionValue);
+        } else {
+          // Add it, filter out non-predefined options like custom text
+          nextSelectionArray = nextSelectionArray.filter(v => options.includes(v));
+          nextSelectionArray.push(optionValue);
+        }
+      } else {
+        // It's a custom text or 'Custom...'
+        nextSelectionArray = nextSelectionArray.filter(v => options.includes(v));
+        if (optionValue === 'Custom...') {
+          nextSelectionArray.push('Custom...');
+        } else if (optionValue !== '') {
+          nextSelectionArray.push(optionValue);
+        }
+      }
+      
+      const newSelections = { ...(item.selections || {}), [placeholderIndex]: nextSelectionArray };
       
       let index = 0;
       const newText = tplText.replace(/<([^>]+)>/g, (match: string) => {
-        const val = newSelections[index] !== undefined ? newSelections[index] : match;
+        const valArray = newSelections[index];
         index++;
-        return val;
+        if (valArray !== undefined && valArray.length > 0 && !valArray.includes('Custom...')) {
+           if (valArray.length === 1) return valArray[0];
+           if (valArray.length === 2) return valArray.join(' and ');
+           return valArray.slice(0, -1).join(', ') + ', and ' + valArray[valArray.length - 1];
+        }
+        return match;
       });
       
       return {
@@ -1106,7 +1139,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     .every(item => !item.text.includes('<') && !item.text.includes('>'));
 
   const handleTabClick = (tab: 'info' | 'checklist' | 'findings' | 'summary' | 'preview') => {
-    if (tab !== 'info' && tab !== 'checklist' && !isChecklistValid) {
+    if (tab !== 'info' && tab !== 'findings' && tab !== 'checklist' && !isChecklistValid) {
       alert('กรุณาเลือกตัวเลือกในขั้นตอนผ่าตัด (เช่น ชนิดของไหม หรือเครื่องมือ) ให้ครบถ้วนก่อนข้ามไปขั้นตอนถัดไป');
       return;
     }
@@ -1459,75 +1492,94 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
       
       {/* Top sticky app header (Hidden when printing) */}
-      <header className="bg-blue-800 text-white px-4 py-3 shadow-md flex justify-between items-center no-print sticky top-0 z-50">
+      <header className="bg-blue-800 text-white px-3 sm:px-4 py-2.5 sm:py-3 shadow-md flex justify-between items-center no-print sticky top-0 z-50">
         <button 
           onClick={handleBackToDashboard} 
-          className="flex items-center space-x-1 hover:text-blue-200 transition text-sm cursor-pointer no-toggle">
+          className="flex items-center space-x-1 hover:text-blue-200 transition text-sm cursor-pointer no-toggle shrink-0">
           <ArrowLeft className="h-4 w-4" />
           <span className="hidden sm:inline font-semibold">Dashboard</span>
         </button>
 
-        <div className="flex items-center space-x-2 text-center">
-          <FileText className="h-5 w-5 text-yellow-300" />
-          <span className="font-bold text-sm tracking-wide">
+        <div className="flex items-center space-x-1.5 sm:space-x-2 text-center mx-1 truncate">
+          <FileText className="h-4.5 w-4.5 text-yellow-300 shrink-0" />
+          <span className="font-bold text-xs sm:text-sm tracking-wide truncate max-w-[130px] sm:max-w-none">
             {noteId ? 'Edit Operative Note' : 'Create Operative Note'}
           </span>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
           {activeTab === 'preview' && (
             <button 
               onClick={handleDownloadPDF} 
               disabled={generatingPdf}
-              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow flex items-center space-x-1 transition">
+              title={generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง pdf file'}
+              aria-label={generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง pdf file'}
+              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg shadow flex items-center space-x-1 transition">
               {generatingPdf ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
               ) : (
-                <FileText className="h-3.5 w-3.5" />
+                <FileText className="h-4 w-4 shrink-0" />
               )}
-              <span>{generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง pdf file'}</span>
+              <span className="hidden sm:inline">{generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง pdf file'}</span>
             </button>
           )}
           <button 
             onClick={handleSave} 
             disabled={saving}
-            className="bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-400 text-blue-900 text-xs font-bold px-3 py-1.5 rounded-lg shadow flex items-center space-x-1 transition">
+            title={noteId ? 'Save Edit' : 'Save Note'}
+            aria-label={noteId ? 'Save Edit' : 'Save Note'}
+            className="bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-400 text-blue-900 text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-lg shadow flex items-center space-x-1 transition">
             {saving ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin shrink-0" />
             ) : (
-              <Save className="h-3.5 w-3.5" />
+              <Save className="h-4 w-4 shrink-0" />
             )}
-            <span>{noteId ? 'Save Edit' : 'Save Note'}</span>
+            <span className="hidden sm:inline">{noteId ? 'Save Edit' : 'Save Note'}</span>
           </button>
         </div>
       </header>
 
       {/* Mobile-Native tab switcher (Hidden when printing) */}
-      <div className="bg-white border-b border-gray-200 flex no-print sticky top-[48px] z-40 shadow-sm text-xs font-bold overflow-x-auto">
+      <div className="bg-white border-b border-gray-200 flex no-print sticky top-[45px] sm:top-[48px] z-40 shadow-sm text-xs font-bold w-full">
         <button 
-          className={`mobile-tab-btn flex-shrink-0 ${activeTab === 'info' ? 'active' : 'text-gray-600'}`}
-          onClick={() => handleTabClick('info')}>
-          1. Patient & Team
+          className={`mobile-tab-btn flex-1 min-w-0 py-2 sm:py-2.5 px-1 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'info' ? 'active' : 'text-gray-600'}`}
+          onClick={() => handleTabClick('info')}
+          title="1. Patient & Team">
+          <User className="h-5 w-5 shrink-0" />
+          <span className="hidden md:inline">1. Patient & Team</span>
+          <span className="text-[10px] font-semibold block md:hidden leading-none mt-1 truncate">Info</span>
         </button>
         <button 
-          className={`mobile-tab-btn flex-shrink-0 ${activeTab === 'checklist' ? 'active' : 'text-gray-600'}`}
-          onClick={() => handleTabClick('checklist')}>
-          2. Operation & Steps
+          className={`mobile-tab-btn flex-1 min-w-0 py-2 sm:py-2.5 px-1 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'findings' ? 'active' : 'text-gray-600'}`}
+          onClick={() => handleTabClick('findings')}
+          title="2. Findings & Photos">
+          <Stethoscope className="h-5 w-5 shrink-0" />
+          <span className="hidden md:inline">2. Findings & Photos</span>
+          <span className="text-[10px] font-semibold block md:hidden leading-none mt-1 truncate">Findings</span>
         </button>
         <button 
-          className={`mobile-tab-btn flex-shrink-0 ${activeTab === 'findings' ? 'active' : 'text-gray-600'}`}
-          onClick={() => handleTabClick('findings')}>
-          3. Findings & Photos
+          className={`mobile-tab-btn flex-1 min-w-0 py-2 sm:py-2.5 px-1 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'checklist' ? 'active' : 'text-gray-600'}`}
+          onClick={() => handleTabClick('checklist')}
+          title="3. Operation & Steps">
+          <ClipboardList className="h-5 w-5 shrink-0" />
+          <span className="hidden md:inline">3. Operation & Steps</span>
+          <span className="text-[10px] font-semibold block md:hidden leading-none mt-1 truncate">Steps</span>
         </button>
         <button 
-          className={`mobile-tab-btn flex-shrink-0 ${activeTab === 'summary' ? 'active' : 'text-gray-600'}`}
-          onClick={() => handleTabClick('summary')}>
-          4. Summary
+          className={`mobile-tab-btn flex-1 min-w-0 py-2 sm:py-2.5 px-1 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'summary' ? 'active' : 'text-gray-600'}`}
+          onClick={() => handleTabClick('summary')}
+          title="4. Summary">
+          <FileCheck className="h-5 w-5 shrink-0" />
+          <span className="hidden md:inline">4. Summary</span>
+          <span className="text-[10px] font-semibold block md:hidden leading-none mt-1 truncate">Summary</span>
         </button>
         <button 
-          className={`mobile-tab-btn flex-shrink-0 ${activeTab === 'preview' ? 'active' : 'text-gray-600'}`}
-          onClick={() => handleTabClick('preview')}>
-          5. A4 Print Preview
+          className={`mobile-tab-btn flex-1 min-w-0 py-2 sm:py-2.5 px-1 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'preview' ? 'active' : 'text-gray-600'}`}
+          onClick={() => handleTabClick('preview')}
+          title="5. A4 Print Preview">
+          <Printer className="h-5 w-5 shrink-0" />
+          <span className="hidden md:inline">5. A4 Print Preview</span>
+          <span className="text-[10px] font-semibold block md:hidden leading-none mt-1 truncate">Preview</span>
         </button>
       </div>
 
@@ -1814,20 +1866,6 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2">
-                <button 
-                  onClick={() => handleTabClick('checklist')}
-                  className="bg-blue-600 text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow hover:bg-blue-700 transition w-full sm:w-auto">
-                  <span>Next: Operation Type</span>
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: Operation & Steps Checklist */}
-          {activeTab === 'checklist' && (
-            <div className="space-y-4">
               {/* Select Operation Preset */}
               <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 space-y-4">
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1 flex items-center">
@@ -1899,6 +1937,20 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                 </div>
               </div>
 
+              <div className="flex justify-end pt-2">
+                <button 
+                  onClick={() => handleTabClick('findings')}
+                  className="bg-blue-600 text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow hover:bg-blue-700 transition w-full sm:w-auto">
+                  <span>Next: Findings</span>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: Operation & Steps Checklist */}
+          {activeTab === 'checklist' && (
+            <div className="space-y-4">
               {/* Steps Checklist */}
               <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 space-y-3">
                 <div className="flex justify-between items-center border-b pb-2">
@@ -2027,8 +2079,10 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                             <div className="no-toggle mt-3 pt-3 border-t border-gray-100 space-y-3 text-xs bg-gray-50/50 p-2.5 rounded-lg">
                               {placeholders.map((ph, phIdx) => {
                                 const options = ph.content.split(/[\/|]/).map(o => o.trim());
-                                const selectedValue = item.selections?.[phIdx];
-                                const isCustomSelected = selectedValue !== undefined && selectedValue !== '' && !options.includes(selectedValue) && selectedValue !== 'Custom...';
+                                const rawSelection = item.selections?.[phIdx];
+                                const selectedValues = Array.isArray(rawSelection) ? rawSelection : (rawSelection !== undefined ? [String(rawSelection)] : []);
+                                const hasCustomValue = selectedValues.some(v => v === 'Custom...' || (v !== '' && !options.includes(v)));
+                                const customValue = selectedValues.find(v => v === 'Custom...' || (v !== '' && !options.includes(v))) || '';
 
                                 return (
                                   <div key={phIdx} className="space-y-1.5 border-b border-gray-100 pb-2.5 last:border-0 last:pb-0">
@@ -2040,7 +2094,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
                                       {options.map(opt => {
-                                        const isSelected = selectedValue === opt;
+                                        const isSelected = selectedValues.includes(opt);
                                         return (
                                           <button
                                             key={opt}
@@ -2058,20 +2112,20 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                                       })}
                                       <button
                                         type="button"
-                                        onClick={() => selectOption(item.id, phIdx, isCustomSelected ? '' : 'Custom...')}
+                                        onClick={() => selectOption(item.id, phIdx, hasCustomValue ? '' : 'Custom...')}
                                         className={`px-2.5 py-1 rounded border text-[11px] font-semibold transition-all cursor-pointer ${
-                                          isCustomSelected || selectedValue === 'Custom...'
+                                          hasCustomValue
                                             ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
                                             : 'bg-white text-gray-700 border-gray-250 hover:bg-gray-100'
                                         }`}
                                       >
-                                        {isCustomSelected || selectedValue === 'Custom...' ? 'ระบุเอง (Custom)' : '✏️ อื่นๆ...'}
+                                        {hasCustomValue ? 'ระบุเอง (Custom)' : '✏️ อื่นๆ...'}
                                       </button>
                                     </div>
-                                    {(isCustomSelected || selectedValue === 'Custom...') && (
+                                    {hasCustomValue && (
                                       <input
                                         type="text"
-                                        value={selectedValue === 'Custom...' ? '' : selectedValue}
+                                        value={customValue === 'Custom...' ? '' : customValue}
                                         onChange={(e) => selectOption(item.id, phIdx, e.target.value)}
                                         placeholder="พิมพ์ระบุข้อความที่ต้องการ..."
                                         className="w-full bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
@@ -2109,28 +2163,28 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
               <div className="flex justify-between pt-2 gap-3">
                 <button 
-                  onClick={() => handleTabClick('info')}
+                  onClick={() => handleTabClick('findings')}
                   className="bg-gray-200 text-gray-700 font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow hover:bg-gray-300 transition w-full sm:w-auto">
                   <ChevronLeft className="h-4 w-4" />
                   <span>Back</span>
                 </button>
                 <button 
                   disabled={!isChecklistValid}
-                  onClick={() => handleTabClick('findings')}
+                  onClick={() => handleTabClick('summary')}
                   className={`font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow transition w-full sm:w-auto ${
                     isChecklistValid 
                       ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer shadow' 
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
                   }`}
                 >
-                  <span>Next: Findings</span>
+                  <span>Next: Summary</span>
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
             </div>
           )}
 
-          {/* TAB 3: Findings & Photos */}
+          {/* TAB 2: Findings & Photos */}
           {activeTab === 'findings' && (
             <div className="space-y-4">
               <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 space-y-4">
@@ -2914,15 +2968,15 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
               <div className="flex justify-between pt-2 gap-3">
                 <button 
-                  onClick={() => handleTabClick('checklist')}
+                  onClick={() => handleTabClick('info')}
                   className="bg-gray-200 text-gray-700 font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow hover:bg-gray-300 transition w-full sm:w-auto">
                   <ChevronLeft className="h-4 w-4" />
                   <span>Back</span>
                 </button>
                 <button 
-                  onClick={() => handleTabClick('summary')}
+                  onClick={() => handleTabClick('checklist')}
                   className="bg-blue-600 text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow hover:bg-blue-700 transition w-full sm:w-auto">
-                  <span>Next: Summary</span>
+                  <span>Next: Operation Steps</span>
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
@@ -3020,7 +3074,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
               <div className="flex justify-between pt-2 gap-3">
                 <button 
-                  onClick={() => handleTabClick('findings')}
+                  onClick={() => handleTabClick('checklist')}
                   className="bg-gray-200 text-gray-700 font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow hover:bg-gray-300 transition w-full sm:w-auto">
                   <ChevronLeft className="h-4 w-4" />
                   <span>Back</span>
@@ -3435,7 +3489,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
               <div className="flex justify-between items-end mt-4 a4-summary-row">
                 {/* EBL Box */}
                 <div className="border border-black p-2.5 w-[58%] text-xs space-y-1">
-                  <div>EBL: <span className="font-bold text-sm">{formData.ebl}</span> ml &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Complication: <span className="font-bold">{formData.complication}</span></div>
+                  <div>EBL: <span className="font-bold text-sm">{formData.ebl}</span> ml &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Complication: <span className="font-bold">{formData.complication && formData.complication !== 'Other' ? formData.complication : 'No'}</span></div>
                   <div>Patho: <span className="font-bold">{formData.patho}</span></div>
                 </div>
 

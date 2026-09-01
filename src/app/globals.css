@@ -187,11 +187,14 @@ body {
 /* Mobile Custom Controls */
 .mobile-tab-btn {
   flex: 1;
-  padding: 10px 4px;
+  padding: 6px 2px;
   text-align: center;
   font-size: 0.85rem;
   font-weight: 600;
   border-bottom: 3px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .mobile-tab-btn.active {
   border-color: #2563eb;
