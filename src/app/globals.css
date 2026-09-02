@@ -5,13 +5,33 @@
 :root {
   --background: #f3f4f6;
   --foreground: #171717;
+  min-height: 100dvh;
 }
 
-body {
+html, body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: 'Sarabun', sans-serif;
+  overscroll-behavior-y: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+
+input, textarea, select {
+  -webkit-user-select: auto;
+  user-select: auto;
+  font-size: 16px;
+}
+
+@layer utilities {
+  .safe-pt {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-pb {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
 /* A4 Page Formatting for Print & Preview */
