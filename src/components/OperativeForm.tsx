@@ -1669,12 +1669,19 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Hospital Number (HN)</label>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-xs font-semibold text-gray-500">Hospital Number (HN)</label>
+                      <span className={`text-[10px] font-mono font-medium ${formData.hn.length === 8 ? 'text-emerald-600' : 'text-gray-400'}`}>
+                        {formData.hn.length}/8 หลัก
+                      </span>
+                    </div>
                     <input 
                       type="text" 
+                      maxLength={8}
+                      placeholder="เช่น 66123456"
                       value={formData.hn} 
-                      onChange={e => setFormData({...formData, hn: e.target.value})} 
-                      className="w-full border rounded-lg p-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={e => setFormData({...formData, hn: e.target.value.replace(/[^\d]/g, '')})} 
+                      className="w-full border rounded-lg p-2.5 text-sm font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
@@ -1765,7 +1772,13 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                       className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <datalist id="surgeon-options">
-                      <option value="พ.เลอพงศ์" />
+                      <option value="ประกาศิต" />
+                      <option value="เลอพงศ์" />
+                      <option value="ณภัทร" />
+                      <option value="ไชยวัฒน์" />
+                      <option value="นิติเทพ" />
+                      <option value="พรชัย" />
+                      <option value="สุรชัย" />
                     </datalist>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
