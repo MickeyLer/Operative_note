@@ -11,8 +11,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "HPB KKH - ระบบงานหน่วยศัลยศาสตร์ตับ ถุงน้ำดี และตับอ่อน รพ.ขอนแก่น",
-  description: "ระบบบันทึกข้อมูลและติดตามการใช้งาน Stapler หน่วยศัลยศาสตร์ตับ ถุงน้ำดี และตับอ่อน โรงพยาบาลขอนแก่น",
+  title: "KKH Digital Operative Note",
+  description: "Khon Kaen Hospital Digital Operative Note Web Application",
   icons: {
     icon: "/hpb-logo.jpg",
     shortcut: "/hpb-logo.jpg",
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    title: "HPB KKH",
+    title: "OpNote",
     statusBarStyle: "black-translucent",
   },
 };
