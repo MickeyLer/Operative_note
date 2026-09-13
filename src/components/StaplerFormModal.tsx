@@ -87,6 +87,7 @@ const TISSUE_OPTIONS = [
 
 const PROCEDURE_PRESETS = [
   'Open Hepatectomy (Major/Minor)',
+  'Open Hilar Hepatectomy',
   'Laparoscopic Hepatectomy',
   'Whipple Operation (Pancreaticoduodenectomy)',
   'Distal Pancreatectomy (± RAMPS)',

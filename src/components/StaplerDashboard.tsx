@@ -61,7 +61,12 @@ export default function StaplerDashboard() {
   // Delete Record
   const handleDelete = async (id?: string) => {
     if (!id) return;
-    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรายการบันทึก Stapler นี้?')) return;
+    const password = prompt('กรุณากรอกรหัสผ่านเพื่อลบข้อมูล:');
+    if (password === null) return;
+    if (password !== '1111') {
+      alert('รหัสผ่านไม่ถูกต้อง');
+      return;
+    }
 
     try {
       const { error } = await supabase

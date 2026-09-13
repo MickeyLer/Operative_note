@@ -32,6 +32,7 @@ interface OperativeNote {
 
 const OP_LABEL_MAP: Record<string, string> = {
   open_hepatectomy: 'Open Hepatectomy',
+  open_hilar_hepatectomy: 'Open Hilar Hepatectomy',
   lap_hepatectomy: 'Laparoscopic Hepatectomy',
   whipple: 'Whipple Operation',
   lap_lar: 'Laparoscopic LAR',
@@ -91,7 +92,13 @@ export default function Dashboard() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this operative note?')) return;
+    const password = prompt('กรุณากรอกรหัสผ่านเพื่อลบข้อมูล:');
+    if (password === null) return;
+    if (password !== '1111') {
+      alert('รหัสผ่านไม่ถูกต้อง');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('operative_notes')
@@ -167,6 +174,7 @@ export default function Dashboard() {
               <option value="all">All Procedures</option>
               <optgroup label="Default Presets (เทมเพลตมาตรฐาน)">
                 <option value="open_hepatectomy">Open Hepatectomy</option>
+                <option value="open_hilar_hepatectomy">Open Hilar Hepatectomy</option>
                 <option value="lap_hepatectomy">Laparoscopic Hepatectomy</option>
                 <option value="whipple">Whipple Operation</option>
                 <option value="lap_lar">Laparoscopic LAR</option>

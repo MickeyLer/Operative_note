@@ -112,12 +112,10 @@ input, textarea, select {
   .a4-footer tbody  { display: block !important; width: 100% !important; }
   .a4-footer tr     { display: flex !important; width: 100% !important; }
   .a4-footer td     { border: 1px solid black !important; padding: 3px 5px !important; font-size: 11px !important; box-sizing: border-box !important; }
-  /* Row 1 column widths: 45% | 15% | 40% */
-  .a4-footer tr:first-child td:nth-child(1) { flex: 0 0 45% !important; }
-  .a4-footer tr:first-child td:nth-child(2) { flex: 0 0 15% !important; }
-  .a4-footer tr:first-child td:nth-child(3) { flex: 0 0 40% !important; }
-  /* Row 2: equal thirds */
-  .a4-footer tr:last-child td { flex: 1 !important; }
+  /* Footer column widths: 37% | 28% | 35% */
+  .a4-footer tr td:nth-child(1) { flex: 0 0 37% !important; width: 37% !important; }
+  .a4-footer tr td:nth-child(2) { flex: 0 0 28% !important; width: 28% !important; }
+  .a4-footer tr td:nth-child(3) { flex: 0 0 35% !important; width: 35% !important; }
   
   /* Specimen Photos print sizes */
   .a4-page img.specimen-print-photo {

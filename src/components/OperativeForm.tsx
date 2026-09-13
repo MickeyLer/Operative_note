@@ -36,7 +36,7 @@ import {
 import ImageCropModal from '@/components/ImageCropModal';
 import { scanPatientSticker } from '@/lib/patientStickerScanner';
 
-type OpKey = 'open_hepatectomy' | 'lap_hepatectomy' | 'whipple' | 'lap_lar' | 'lap_chole' | 'ramps';
+type OpKey = 'open_hepatectomy' | 'open_hilar_hepatectomy' | 'lap_hepatectomy' | 'whipple' | 'lap_lar' | 'lap_chole' | 'ramps';
 
 interface OperationPreset {
   title: string;
@@ -44,6 +44,7 @@ interface OperationPreset {
   incision: string;
   icg_flr?: boolean;
   pd_size?: boolean;
+  gb_findings?: boolean;
   ln_options: string[];
   procedures: string[];
   is_laparoscopic?: boolean;
@@ -57,6 +58,7 @@ interface UserTemplate {
   incision: string;
   icg_flr: boolean;
   pd_size: boolean;
+  gb_findings?: boolean;
   ln_options: string[];
   procedures: string[];
   is_laparoscopic: boolean;
@@ -73,6 +75,26 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "A skin incision was made and the abdomen was entered.",
       "A thorough exploration of the abdominal cavity was performed.",
       "The hepatoduodenal ligament was skeletonized; the CHA, HAP, RHA, LHA, MHA, MPV, RPV, and LPV were identified.",
+      "A cholecystectomy was performed.",
+      "The vascular inflow vessels were individually ligated and divided.",
+      "Mobilization of the liver was completed.",
+      "Parenchymal transection was performed using <CUSA/Thunderbeat/Harmonic/Ligasure/cautery> under <Pringle maneuver (clamping for 15 minutes, followed by a 5-minute release)/inflow occlusion>.",
+      "The hepatic vein was divided using a <vascular stapler/Hem-o-lok clips/ligatures>.",
+      "Hemostasis was verified and secured.",
+      "JP drains were placed in the <subhepatic and right subphrenic/subhepatic/right subphrenic> spaces.",
+      "The abdomen was closed in layers using a <Vicryl/PDS loop/Monocryl/Prolene> suture, and the skin was approximated with <staples/nylon/subcuticular monocryl>."
+    ]
+  },
+  open_hilar_hepatectomy: {
+    title: "Open Hilar Hepatectomy",
+    position: "Supine",
+    incision: "Mirror-L incision",
+    icg_flr: true,
+    ln_options: ["gr8", "gr12", "gr13"],
+    procedures: [
+      "A skin incision was made and the abdomen was entered.",
+      "A thorough exploration of the abdominal cavity was performed.",
+      "The hepatoduodenal ligament was skeletonized; the CHA, HAP, RHA, LHA, MHA, MPV, RPV, and LPV were identified.",
       "A Glissonean approach was utilized for vascular inflow control.",
       "A cholecystectomy was performed.",
       "Resection of the distal common bile duct (CBD) was performed at its intrapancreatic portion.",
@@ -80,8 +102,8 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "Mobilization of the liver was completed.",
       "Parenchymal transection was performed using <CUSA/Thunderbeat/Harmonic/Ligasure/cautery> under <Pringle maneuver (clamping for 15 minutes, followed by a 5-minute release)/inflow occlusion>.",
       "The hepatic vein was divided using a <vascular stapler/Hem-o-lok clips/ligatures>.",
-      "The proximal bile duct was divided with a margin of at least 1 cm from the tumor, and ductoplasty was performed.",
-      "A Roux-en-Y hepaticojejunostomy was constructed using <5-0 PDS/4-0 PDS/4-0 vicryl/4-0 monocryl> sutures.",
+      "The proximal bile duct was divided with a margin of at least 1 cm from the tumor, and <ductoplasty was performed/no ductoplasty was performed>.",
+      "A Roux-en-Y hepaticojejunostomy was constructed using <5-0 PDS/4-0 PDS/4-0 vicryl/4-0 monocryl> sutures <without a stent/with an internal stent/with an external stent>.",
       "Hemostasis was verified and secured.",
       "JP drains were placed in the <subhepatic and right subphrenic/subhepatic/right subphrenic> spaces.",
       "The abdomen was closed in layers using a <Vicryl/PDS loop/Monocryl/Prolene> suture, and the skin was approximated with <staples/nylon/subcuticular monocryl>."
@@ -126,7 +148,7 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "The proximal jejunum was divided using a GIA stapler.",
       "Finally, the uncinate process was dissected from the SMV and PV.",
       "Hemostasis was verified and secured.",
-      "Pancreaticojejunostomy (PJ) anastomosis was constructed using the modified Blumgart technique (duct-to-mucosa) with <5-0 PDS/4-0 PDS/5-0 Prolene> sutures (<12 stitch/10 stitch/8 stitch/14 stitch/16 stitch>).",
+      "Pancreaticojejunostomy (PJ) anastomosis was constructed using the modified Blumgart technique (duct-to-mucosa) with <5-0 PDS/4-0 PDS/5-0 Prolene> sutures (<12 stitch/10 stitch/8 stitch/14 stitch/16 stitch>) <with an internal stent/with an external stent/without a stent>.",
       "Hepaticojejunostomy (HJ) anastomosis was constructed using <4-0 Monocryl/5-0 Monocryl/4-0 PDS/4-0 Vicryl> sutures (<continuous/interrupted>).",
       "Gastrojejunostomy (GJ) anastomosis was constructed using <3-0 Monocryl/4-0 Monocryl/3-0 Vicryl/GIA stapler> sutures.",
       "Jejunojejunostomy (JJ) anastomosis was constructed using <3-0 Monocryl/4-0 Monocryl/3-0 Vicryl> sutures.",
@@ -158,10 +180,11 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
   lap_chole: {
     title: "Laparoscopic Cholecystectomy",
     position: "Supine / Reverse Trendelenburg with left tilt",
-    incision: "4-port technique (10 mm umbilical, 10 mm epigastric, and two 5 mm RUQ ports)",
+    incision: "Laparoscopic port sites",
+    gb_findings: true,
     ln_options: ["Calot LN"],
     procedures: [
-      "Pneumoperitoneum was established at 12 mmHg.",
+      "<An infraumbilical/A supraumbilical/An umbilical> incision was made, and pneumoperitoneum was established at 12 mmHg.",
       "The gallbladder was retracted superiorly over the liver.",
       "Dissection of Calot's triangle was performed to achieve the Critical View of Safety (CVS).",
       "The cystic duct and cystic artery were clearly identified.",
@@ -169,8 +192,8 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "The cystic artery was clipped with <Hem-o-lok clips/titanium clips> and divided.",
       "The gallbladder was dissected off the liver bed using <an electrocautery hook/Harmonic scalpel>.",
       "Hemostasis of the gallbladder fossa was verified.",
-      "The gallbladder was extracted in an extraction bag (Endo-bag) via the umbilical port.",
-      "The abdomen was deflated, and the port sites were closed."
+      "The gallbladder was extracted <in an extraction bag (Endo-bag)/without an extraction bag> via the umbilical port.",
+      "The abdomen was deflated, and the port sites were closed using <Nylon/4-0 Monocryl/4-0 Vicryl/Steri-Strips>."
     ]
   },
   ramps: {
@@ -254,7 +277,14 @@ interface OperativeFormProps {
 
 export default function OperativeForm({ noteId, initialPrint = false }: OperativeFormProps) {
   const router = useRouter();
+  const [currentNoteId, setCurrentNoteId] = useState<string | undefined>(noteId);
   const [activeTab, setActiveTab] = useState<'info' | 'checklist' | 'findings' | 'summary' | 'preview'>('info');
+
+  useEffect(() => {
+    if (noteId) {
+      setCurrentNoteId(noteId);
+    }
+  }, [noteId]);
   const [selectedOpKey, setSelectedOpKey] = useState<string>('');
   const [loading, setLoading] = useState(!!noteId);
   const [saving, setSaving] = useState(false);
@@ -347,6 +377,15 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     flr: "",
     pdSize: "",
     pancreaticConsistency: "",
+    gbSize: "",
+    gbState: "",
+    adhesionGb: "No",
+    adhesionGbDetail: "",
+    presenceGallStone: "No",
+    cysticDuctSize: "",
+    liverStatus: "normal",
+    prevAbdominalSurgery: "No",
+    prevAbdominalSurgeryDetail: "",
     selectedLN: [] as string[],
     consistency: "", // hard, firm, soft
     adhesionHd: "No", // No / Yes
@@ -643,6 +682,15 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
             flr: data.findings.flr || '',
             pdSize: data.findings.pdSize || '',
             pancreaticConsistency: data.findings.pancreaticConsistency || '',
+            gbSize: data.findings.gbSize || '',
+            gbState: data.findings.gbState || '',
+            adhesionGb: data.findings.adhesionGb || 'No',
+            adhesionGbDetail: data.findings.adhesionGbDetail || '',
+            presenceGallStone: data.findings.presenceGallStone || 'No',
+            cysticDuctSize: data.findings.cysticDuctSize || '',
+            liverStatus: data.findings.liverStatus || 'normal',
+            prevAbdominalSurgery: data.findings.prevAbdominalSurgery || 'No',
+            prevAbdominalSurgeryDetail: data.findings.prevAbdominalSurgeryDetail || '',
             selectedLN: data.findings.selectedLN || [],
             consistency: data.findings.consistency || 'soft',
             adhesionHd: data.findings.adhesionHd || 'No',
@@ -722,8 +770,26 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
         flr: "",
         pdSize: "",
         pancreaticConsistency: "",
+        gbSize: "",
+        gbState: "",
+        adhesionGb: "No",
+        adhesionGbDetail: "",
+        presenceGallStone: "No",
+        cysticDuctSize: "",
+        liverStatus: "normal",
+        prevAbdominalSurgery: "No",
+        prevAbdominalSurgeryDetail: "",
         selectedLN: [],
-        ports: [],
+        ports: key === 'lap_chole' ? [
+          { id: '1', x: 50, y: 56, size: '10mm' },
+          { id: '2', x: 48, y: 32, size: '5mm' },
+          { id: '3', x: 33, y: 38, size: '5mm' }
+        ] : key === 'lap_hepatectomy' ? [
+          { id: '1', x: 50, y: 56, size: '12mm' },
+          { id: '2', x: 35, y: 40, size: '10mm' },
+          { id: '3', x: 65, y: 40, size: '5mm' },
+          { id: '4', x: 25, y: 45, size: '5mm' }
+        ] : [],
         tumorSize: "",
         selectedSegments: [],
         customSegment: "",
@@ -812,7 +878,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
   };
 
   const handleUpdateTemplate = async () => {
-    const isUserTpl = !['open_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole', 'ramps'].includes(selectedOpKey);
+    const isUserTpl = !['open_hepatectomy', 'open_hilar_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole', 'ramps'].includes(selectedOpKey);
     if (!isUserTpl) return;
 
     if (!confirm("Are you sure you want to update this template with current form steps and procedure name?")) return;
@@ -839,7 +905,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
   };
 
   const handleDeleteTemplate = async () => {
-    const isUserTpl = !['open_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole', 'ramps'].includes(selectedOpKey);
+    const isUserTpl = !['open_hepatectomy', 'open_hilar_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole', 'ramps'].includes(selectedOpKey);
     if (!isUserTpl) return;
 
     if (!confirm("Are you sure you want to delete this template? Operative notes using this template will not be affected.")) return;
@@ -1286,9 +1352,13 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
   };
 
   // Save to database
-  const handleSave = async () => {
+  const handleSave = async (redirectOnSave: boolean | React.MouseEvent = true, silent = false): Promise<boolean> => {
+    const shouldRedirect = typeof redirectOnSave === 'boolean' ? redirectOnSave : true;
+    const shouldBeSilent = typeof silent === 'boolean' ? silent : false;
+
     setSaving(true);
     try {
+      const activeId = currentNoteId || noteId;
       const payload = {
         op_date: formData.opDate,
         time_started: formData.timeStarted,
@@ -1308,6 +1378,15 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           flr: formData.flr,
           pdSize: formData.pdSize,
           pancreaticConsistency: formData.pancreaticConsistency,
+          gbSize: formData.gbSize,
+          gbState: formData.gbState,
+          adhesionGb: formData.adhesionGb,
+          adhesionGbDetail: formData.adhesionGbDetail,
+          presenceGallStone: formData.presenceGallStone,
+          cysticDuctSize: formData.cysticDuctSize,
+          liverStatus: formData.liverStatus,
+          prevAbdominalSurgery: formData.prevAbdominalSurgery,
+          prevAbdominalSurgeryDetail: formData.prevAbdominalSurgeryDetail,
           selectedLN: formData.selectedLN,
           consistency: formData.consistency,
           adhesionHd: formData.adhesionHd,
@@ -1347,29 +1426,44 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
         photos: formData.photos
       };
 
-      if (noteId) {
-        // Edit mode
+      if (activeId) {
+        // Edit mode / Update existing
         const { error } = await supabase
           .from('operative_notes')
           .update(payload)
-          .eq('id', noteId);
+          .eq('id', activeId);
 
         if (error) throw error;
-        alert('Operative Note updated successfully!');
+        if (!shouldBeSilent) {
+          alert('Operative Note updated successfully!');
+        }
       } else {
-        // Create mode
-        const { error } = await supabase
+        // Create mode / Insert new
+        const { data, error } = await supabase
           .from('operative_notes')
-          .insert(payload);
+          .insert(payload)
+          .select('id')
+          .single();
 
         if (error) throw error;
-        alert('Operative Note saved successfully!');
+        if (data?.id) {
+          setCurrentNoteId(data.id);
+        }
+        if (!shouldBeSilent) {
+          alert('Operative Note saved successfully!');
+        }
       }
 
-      router.push('/');
+      setIsDirty(false);
+
+      if (shouldRedirect) {
+        router.push('/');
+      }
+      return true;
     } catch (err) {
       console.error('Error saving note:', err);
       alert('Failed to save operative note. Check console for details.');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1380,6 +1474,13 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     setGeneratingPdf(true);
 
     try {
+      // 0. Auto-save form data to database before generating PDF
+      const saveSuccess = await handleSave(false, true);
+      if (!saveSuccess) {
+        setGeneratingPdf(false);
+        return;
+      }
+
       // 1. Dynamic imports of html-to-image and jspdf to avoid SSR issues
       const { toPng } = await import('html-to-image');
       const { jsPDF } = await import('jspdf');
@@ -1508,10 +1609,10 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           {activeTab === 'preview' && (
             <button 
               onClick={handleDownloadPDF} 
-              disabled={generatingPdf}
+              disabled={saving || generatingPdf}
               title={generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง pdf file'}
               aria-label={generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง pdf file'}
-              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg shadow flex items-center space-x-1 transition">
+              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg shadow flex items-center space-x-1 transition cursor-pointer">
               {generatingPdf ? (
                 <Loader2 className="h-4 w-4 animate-spin shrink-0" />
               ) : (
@@ -1521,7 +1622,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
             </button>
           )}
           <button 
-            onClick={handleSave} 
+            onClick={() => handleSave()} 
             disabled={saving}
             title={noteId ? 'Save Edit' : 'Save Note'}
             aria-label={noteId ? 'Save Edit' : 'Save Note'}
@@ -1610,7 +1711,6 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                       ref={stickerFileInputRef} 
                       onChange={handleStickerFileChange} 
                       accept="image/*" 
-                      capture="environment" 
                       className="hidden" 
                     />
                     <button
@@ -1840,6 +1940,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     <label className="block text-xs font-semibold text-gray-500 mb-1">Clinical Diagnosis (การวินิจฉัยก่อนผ่าตัด)</label>
                     <input 
                       type="text" 
+                      list="diagnosis-options"
                       value={formData.clinicalDiagnosis} 
                       onChange={e => {
                         const val = e.target.value;
@@ -1851,6 +1952,18 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                       }} 
                       className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                    <datalist id="diagnosis-options">
+                      <option value="Hepatocellular carcinoma" />
+                      <option value="Mass-forming cholangiocarcinoma" />
+                      <option value="Perihilar cholangiocarcinoma" />
+                      <option value="Distal common bile duct cholangiocarcinoma" />
+                      <option value="Pancreatic head cancer" />
+                      <option value="Gall bladder cancer" />
+                      <option value="Intraductal papillary neoplasm of bile duct" />
+                      <option value="Intraductal papillary mucinous neoplasm" />
+                      <option value="Mucinous neoplasm" />
+                      <option value="Distal pancreatic cancer" />
+                    </datalist>
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
@@ -1873,6 +1986,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     </div>
                     <input 
                       type="text" 
+                      list="diagnosis-options"
                       value={formData.postOpDiagnosis} 
                       onChange={e => {
                         setFormData({...formData, postOpDiagnosis: e.target.value});
@@ -1897,6 +2011,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                   <option value="" disabled>-- เลือกประเภทการผ่าตัด (Select Operation) --</option>
                   <optgroup label="Default Presets (เทมเพลตมาตรฐาน)">
                     <option value="open_hepatectomy">Open Hepatectomy</option>
+                    <option value="open_hilar_hepatectomy">Open Hilar Hepatectomy</option>
                     <option value="lap_hepatectomy">Laparoscopic Hepatectomy</option>
                     <option value="whipple">Whipple operation</option>
                     <option value="lap_lar">Laparoscopic LAR with anastomosis</option>
@@ -1922,7 +2037,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     <span>Save as New Template (บันทึกเป็นเทมเพลตใหม่)</span>
                   </button>
 
-                  {selectedOpKey !== '' && !['open_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole', 'ramps'].includes(selectedOpKey) && (
+                  {selectedOpKey !== '' && !['open_hepatectomy', 'open_hilar_hepatectomy', 'lap_hepatectomy', 'whipple', 'lap_lar', 'lap_chole', 'ramps'].includes(selectedOpKey) && (
                     <>
                       <button
                         type="button"
@@ -1945,13 +2060,42 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Operative Procedure Name (for template)</label>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Operative Procedure Name</label>
                   <input 
                     type="text" 
                     value={formData.operativeProcedure} 
                     onChange={e => setFormData({...formData, operativeProcedure: e.target.value})} 
                     className="w-full border rounded-lg p-2.5 text-sm font-semibold text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+                    <span className="text-[11px] font-medium text-gray-400 mr-1">Quick Add:</span>
+                    {[
+                      'intraoperative ultrasound',
+                      'cholecystectomy',
+                      'caudate resection',
+                      'bile duct resection',
+                      'LN dissection'
+                    ].map((term) => (
+                      <button
+                        key={term}
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => {
+                            const current = (prev.operativeProcedure || '').trim();
+                            if (!current) {
+                              return { ...prev, operativeProcedure: term };
+                            }
+                            const cleaned = current.replace(/[\s,]+$/, '');
+                            return { ...prev, operativeProcedure: `${cleaned}, ${term}` };
+                          });
+                        }}
+                        className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border border-blue-200 transition cursor-pointer flex items-center space-x-1 select-none"
+                      >
+                        <Plus className="h-3 w-3 text-blue-500" />
+                        <span>{term}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -2622,6 +2766,161 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                   </>
                 )}
 
+                {(currentPreset.gb_findings || selectedOpKey === 'lap_chole') && (
+                  <div className="border border-emerald-200 rounded-xl p-4 bg-emerald-50/20 space-y-4">
+                    <h3 className="font-bold text-emerald-900 text-xs uppercase tracking-wider border-b pb-1.5 border-emerald-200 flex items-center">
+                      <Stethoscope className="h-4 w-4 text-emerald-600 mr-1.5" />
+                      Gallbladder & Liver Findings (การตรวจพบเกี่ยวกับถุงน้ำดีและตับ)
+                    </h3>
+
+                    {/* Gallbladder Size & State */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Gallbladder size (cm):</label>
+                        <div className="flex items-center space-x-2">
+                          <input 
+                            type="text" 
+                            placeholder="e.g. 8 x 3 or 7"
+                            value={formData.gbSize}
+                            onChange={e => setFormData({...formData, gbSize: e.target.value})}
+                            className="w-full border border-gray-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-medium"
+                          />
+                          <span className="text-xs font-bold text-gray-500">cm</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Gallbladder state:</label>
+                        <div className="flex gap-2">
+                          {['contracted', 'distended'].map(st => (
+                            <button
+                              key={st}
+                              type="button"
+                              onClick={() => setFormData({...formData, gbState: formData.gbState === st ? '' : st})}
+                              className={`flex-1 py-2 text-xs font-bold rounded-lg border capitalize transition cursor-pointer select-none ${
+                                formData.gbState === st
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              {st}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Adhesion around GB & Presence of Gall Stone */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="bg-white/60 p-2.5 rounded-lg border border-emerald-100 space-y-1.5">
+                        <label className="block text-xs font-bold text-gray-700">Adhesion around GB:</label>
+                        <div className="flex items-center space-x-4">
+                          {['No', 'Yes'].map(opt => (
+                            <label key={opt} className="inline-flex items-center cursor-pointer text-xs font-semibold text-gray-700">
+                              <input 
+                                type="radio" 
+                                name="adhesionGb" 
+                                checked={formData.adhesionGb === opt} 
+                                onChange={() => setFormData({...formData, adhesionGb: opt})}
+                                className="h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 cursor-pointer mr-1"
+                              />
+                              {opt}
+                            </label>
+                          ))}
+                        </div>
+                        {formData.adhesionGb === 'Yes' && (
+                          <input 
+                            type="text" 
+                            placeholder="Specify details of adhesion around GB..."
+                            value={formData.adhesionGbDetail}
+                            onChange={e => setFormData({...formData, adhesionGbDetail: e.target.value})}
+                            className="w-full border border-gray-300 rounded-lg p-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 mt-1"
+                          />
+                        )}
+                      </div>
+
+                      <div className="bg-white/60 p-2.5 rounded-lg border border-emerald-100 space-y-1.5">
+                        <label className="block text-xs font-bold text-gray-700">Presence of gall stone:</label>
+                        <div className="flex items-center space-x-4 pt-1">
+                          {['No', 'Yes'].map(opt => (
+                            <label key={opt} className="inline-flex items-center cursor-pointer text-xs font-semibold text-gray-700">
+                              <input 
+                                type="radio" 
+                                name="presenceGallStone" 
+                                checked={formData.presenceGallStone === opt} 
+                                onChange={() => setFormData({...formData, presenceGallStone: opt})}
+                                className="h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 cursor-pointer mr-1"
+                              />
+                              {opt === 'Yes' ? 'Yes (Present)' : 'No (Absent)'}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cystic Duct Size & Liver Condition */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Cystic duct size:</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. 3 mm or 0.4 cm"
+                          value={formData.cysticDuctSize}
+                          onChange={e => setFormData({...formData, cysticDuctSize: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Liver condition:</label>
+                        <div className="flex gap-1.5">
+                          {['normal', 'fatty liver', 'cirrhosis'].map(liv => (
+                            <button
+                              key={liv}
+                              type="button"
+                              onClick={() => setFormData({...formData, liverStatus: liv})}
+                              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border capitalize transition cursor-pointer select-none ${
+                                formData.liverStatus === liv
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm font-bold'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              {liv}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Previous Abdominal Surgery / ERCP */}
+                    <div className="bg-white/60 p-2.5 rounded-lg border border-emerald-100 space-y-1.5">
+                      <label className="block text-xs font-bold text-gray-700">Previous abdominal surgery / ERCP:</label>
+                      <div className="flex items-center space-x-4">
+                        {['No', 'Yes'].map(opt => (
+                          <label key={opt} className="inline-flex items-center cursor-pointer text-xs font-semibold text-gray-700">
+                            <input 
+                              type="radio" 
+                              name="prevAbdominalSurgery" 
+                              checked={formData.prevAbdominalSurgery === opt} 
+                              onChange={() => setFormData({...formData, prevAbdominalSurgery: opt})}
+                              className="h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 cursor-pointer mr-1"
+                            />
+                            {opt}
+                          </label>
+                        ))}
+                      </div>
+                      {formData.prevAbdominalSurgery === 'Yes' && (
+                        <input 
+                          type="text" 
+                          placeholder="Specify previous surgery or ERCP details..."
+                          value={formData.prevAbdominalSurgeryDetail}
+                          onChange={e => setFormData({...formData, prevAbdominalSurgeryDetail: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg p-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 mt-1"
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Lymph Node Enlargement Selection Chips */}
                 <div>
                   <label className="text-xs font-bold text-gray-700 block mb-2">Lymph Node Enlargement (Select all that apply):</label>
@@ -3138,32 +3437,35 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           ) : (
             <>
               <div className="no-print mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-center bg-blue-50 border border-blue-200 p-4 rounded-xl gap-3">
-            <div className="flex items-center space-x-2 flex-wrap gap-2">
-              <button 
-                onClick={() => handleTabClick('summary')}
-                className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-semibold px-3 py-2 rounded-lg flex items-center space-x-1.5 shadow-sm transition">
-                <ChevronLeft className="h-3.5 w-3.5" />
-                <span>Back to Edit Form</span>
-              </button>
-              <button 
-                onClick={() => setIsZoomed(!isZoomed)}
-                className="max-[820px]:inline-flex hidden text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-2 rounded-lg items-center space-x-1.5 shadow-sm transition"
-              >
-                {isZoomed ? (
-                  <>
-                    <Minimize2 className="h-3.5 w-3.5" />
-                    <span>Fit to Screen (ย่อขนาดพอดีจอ)</span>
-                  </>
-                ) : (
-                  <>
-                    <Maximize2 className="h-3.5 w-3.5" />
-                    <span>Full Size / Scroll (ขยายเต็มจอ)</span>
-                  </>
-                )}
-              </button>
-            </div>
-            <span className="text-xs text-gray-500 font-medium">Standard A4 Document Simulation (Click Print / PDF above to save or print)</span>
-          </div>
+                <div className="flex items-center space-x-2 flex-wrap gap-2">
+                  <button 
+                    onClick={() => handleTabClick('summary')}
+                    className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-semibold px-3 py-2 rounded-lg flex items-center space-x-1.5 shadow-sm transition">
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                    <span>Back to Edit Form</span>
+                  </button>
+                  <button 
+                    onClick={() => setIsZoomed(!isZoomed)}
+                    className="max-[820px]:inline-flex hidden text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-2 rounded-lg items-center space-x-1.5 shadow-sm transition"
+                  >
+                    {isZoomed ? (
+                      <>
+                        <Minimize2 className="h-3.5 w-3.5" />
+                        <span>Fit to Screen (ย่อขนาดพอดีจอ)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Maximize2 className="h-3.5 w-3.5" />
+                        <span>Full Size / Scroll (ขยายเต็มจอ)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="flex items-center space-x-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg shadow-sm">
+                  <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span>ระบบจะบันทึกข้อมูลให้อัตโนมัติเมื่อกดสร้าง PDF</span>
+                </div>
+              </div>
 
           {/* EXACT A4 PAGE PRINTABLE DOCUMENT */}
           <div 
@@ -3277,7 +3579,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                   )}
 
                   {/* Laparoscopic Ports & Specimen Photos Layout */}
-                  {isLaparoscopic && formData.ports && formData.ports.length > 0 ? (
+                  {isLaparoscopic ? (
                     <div className="space-y-1.5">
                       <div className="flex gap-2 items-stretch my-1.5">
                         {/* Ports Diagram (Left) */}
@@ -3290,7 +3592,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                               alt="Abdomen outline" 
                               className="absolute inset-0 w-full h-full object-contain pointer-events-none print-abdomen-bg" 
                             />
-                            {formData.ports.map(port => (
+                            {formData.ports && formData.ports.map(port => (
                               <div
                                 key={port.id}
                                 style={{ left: `${port.x}%`, top: `${port.y}%` }}
@@ -3329,6 +3631,16 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                       {/* Findings Details Text Box */}
                       <div>
                         <strong>Findings:</strong>
+                        {(currentPreset.gb_findings || selectedOpKey === 'lap_chole') && (
+                          <div className="text-black font-semibold mb-1 leading-relaxed bg-emerald-50/10 p-1.5 rounded border border-dashed border-emerald-300 text-xs space-y-0.5">
+                            <div>• <strong>Gallbladder size:</strong> <span className="underline">{formData.gbSize || '.....'}</span> cm ({formData.gbState ? <span className="underline">{formData.gbState}</span> : 'contracted or distended'})</div>
+                            <div>• <strong>Adhesion around GB:</strong> <span className="underline">{formData.adhesionGb === 'Yes' ? (formData.adhesionGbDetail ? `Yes (${formData.adhesionGbDetail})` : 'Yes') : 'No'}</span></div>
+                            <div>• <strong>Gall stone:</strong> <span className="underline">{formData.presenceGallStone === 'Yes' ? 'Present' : 'No'}</span></div>
+                            <div>• <strong>Cystic duct size:</strong> <span className="underline">{formData.cysticDuctSize || '....'}</span></div>
+                            <div>• <strong>Liver:</strong> <span className="underline">{formData.liverStatus || 'normal'}</span></div>
+                            <div>• <strong>Previous abdominal surgery/ERCP:</strong> <span className="underline">{formData.prevAbdominalSurgery === 'Yes' ? (formData.prevAbdominalSurgeryDetail ? `Yes (${formData.prevAbdominalSurgeryDetail})` : 'Yes') : 'No'}</span></div>
+                          </div>
+                        )}
                         {currentPreset.icg_flr && (
                           <p className="text-black font-semibold mb-1 leading-relaxed bg-blue-50/10 p-1 rounded border border-dashed border-blue-200 text-xs">
                             • Tumor size <span className="underline">{formData.tumorSize || '......'}</span> cm at liver segment <span className="underline">{(() => {
@@ -3524,24 +3836,24 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
               <table className="w-full border-collapse border border-black text-xs">
                 <tbody>
                   <tr>
-                    <td className="border border-black p-2 w-[45%]">
+                    <td className="border border-black p-2 w-[37%]">
                       Name of patient: <strong className="text-sm">{formData.patientName}</strong>
                     </td>
-                    <td className="border border-black p-2 w-[15%]">
+                    <td className="border border-black p-2 w-[28%]">
                       Age: <strong className="text-sm">{formData.patientAge}</strong>
                     </td>
-                    <td className="border border-black p-2 w-[40%]">
+                    <td className="border border-black p-2 w-[35%]">
                       HN: <strong className="font-mono text-sm">{formData.hn}</strong> &nbsp;&nbsp;&nbsp;&nbsp; AN: <strong className="font-mono text-sm">{formData.an}</strong>
                     </td>
                   </tr>
                   <tr>
-                    <td className="border border-black p-2">
+                    <td className="border border-black p-2 w-[37%]">
                       Surgeon: <strong className="text-sm">{formData.surgeon}</strong>
                     </td>
-                    <td className="border border-black p-2">
+                    <td className="border border-black p-2 w-[28%]">
                       Ward: <strong className="text-sm">{formData.ward}</strong>
                     </td>
-                    <td className="border border-black p-2">
+                    <td className="border border-black p-2 w-[35%]">
                       Department: <strong className="text-sm">{formData.department}</strong>
                     </td>
                   </tr>
