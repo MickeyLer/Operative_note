@@ -31,10 +31,13 @@ import {
   ClipboardList,
   FileCheck,
   Stethoscope,
-  Edit2
+  Edit2,
+  RotateCcw,
+  CheckCircle2
 } from 'lucide-react';
 import ImageCropModal from '@/components/ImageCropModal';
 import { scanPatientSticker } from '@/lib/patientStickerScanner';
+import { useOperativeDraft } from '@/hooks/useOperativeDraft';
 
 type OpKey = 'open_hepatectomy' | 'open_hilar_hepatectomy' | 'lap_hepatectomy' | 'whipple' | 'lap_lar' | 'lap_chole' | 'ramps';
 
@@ -270,6 +273,90 @@ const TextareaAutosize = ({ value, onChange, placeholder, className, disabled, .
   );
 };
 
+const DIAGNOSIS_OPTIONS = [
+  'Hepatocellular carcinoma',
+  'Mass-forming cholangiocarcinoma',
+  'Perihilar cholangiocarcinoma',
+  'Distal common bile duct cholangiocarcinoma',
+  'Pancreatic head cancer',
+  'Gall bladder cancer',
+  'Intraductal papillary neoplasm of bile duct',
+  'Intraductal papillary mucinous neoplasm',
+  'Mucinous neoplasm',
+  'Distal pancreatic cancer',
+  'Chronic calculous cholecystitis',
+  'Common bile duct stone',
+  'Acute cholangitis'
+];
+
+interface TextareaAutocompleteProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  value: string;
+  onChangeValue: (val: string) => void;
+  options: string[];
+  placeholder?: string;
+  className?: string;
+}
+
+const TextareaAutosizeWithAutocomplete = ({
+  value,
+  onChangeValue,
+  options,
+  placeholder,
+  className,
+  ...props
+}: TextareaAutocompleteProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filteredOptions = options.filter(opt =>
+    !value || opt.toLowerCase().includes(value.toLowerCase())
+  );
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <TextareaAutosize
+        value={value}
+        onChange={(e) => {
+          onChangeValue(e.target.value);
+          setIsOpen(true);
+        }}
+        onFocus={() => setIsOpen(true)}
+        placeholder={placeholder}
+        className={className}
+        {...props}
+      />
+      {isOpen && filteredOptions.length > 0 && (
+        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 max-h-48 overflow-y-auto divide-y divide-gray-100">
+          {filteredOptions.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onChangeValue(opt);
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 text-blue-900 transition cursor-pointer font-medium"
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface OperativeFormProps {
   noteId?: string;
   initialPrint?: boolean;
@@ -345,9 +432,14 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     ln_options_str: ""
   });
 
-  // [P0] Unsaved changes guard
+  // [P0] Unsaved changes guard & Draft Auto-Save
   const [isDirty, setIsDirty] = useState(false);
   const [confirmNavDest, setConfirmNavDest] = useState<string | null>(null);
+
+  // Hook for Local Storage Draft Auto-Save
+  const { existingDraft, lastSavedTime, saveDraft, clearDraft } = useOperativeDraft(noteId);
+  const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [isFormInitialized, setIsFormInitialized] = useState(false);
 
   // Toast notification state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -648,6 +740,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       if (!noteId) {
         setChecklist([]);
         setLoading(false);
+        setIsFormInitialized(true);
         return;
       }
 
@@ -744,6 +837,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
         alert('Failed to load note details');
       } finally {
         setLoading(false);
+        setIsFormInitialized(true);
         if (initialPrint) {
           setActiveTab('preview');
         }
@@ -752,6 +846,59 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
     loadData();
   }, [noteId, initialPrint]);
+
+  // Check draft prompt when form finishes loading
+  useEffect(() => {
+    if (!loading && existingDraft) {
+      setShowDraftBanner(true);
+    }
+  }, [loading, existingDraft]);
+
+  // Restore draft handler
+  const handleRestoreDraft = () => {
+    if (!existingDraft) return;
+    if (existingDraft.selectedOpKey) {
+      setSelectedOpKey(existingDraft.selectedOpKey);
+    }
+    if (existingDraft.formData) {
+      setFormData(prev => ({
+        ...prev,
+        ...existingDraft.formData
+      }));
+    }
+    if (existingDraft.checklist && existingDraft.checklist.length > 0) {
+      setChecklist(existingDraft.checklist);
+    }
+    if (existingDraft.activeTab) {
+      setActiveTab(existingDraft.activeTab as any);
+    }
+    setIsDirty(true);
+    setShowDraftBanner(false);
+    showToast('ดึงข้อมูลร่างที่บันทึกไว้ในเครื่องเรียบร้อยแล้ว', 'success');
+  };
+
+  const handleDiscardDraft = () => {
+    clearDraft();
+    setShowDraftBanner(false);
+    showToast('ลบข้อมูลร่างเรียบร้อยแล้ว', 'info');
+  };
+
+  // Auto-save draft effect (debounced 500ms)
+  useEffect(() => {
+    if (!isFormInitialized || loading) return;
+
+    const timer = setTimeout(() => {
+      saveDraft({
+        selectedOpKey,
+        formData,
+        checklist,
+        activeTab
+      });
+      setIsDirty(true);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [formData, checklist, selectedOpKey, activeTab, isFormInitialized, loading, saveDraft]);
 
 
   // Switch Operation type & sync default details
@@ -1455,6 +1602,8 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       }
 
       setIsDirty(false);
+      clearDraft();
+      setShowDraftBanner(false);
 
       if (shouldRedirect) {
         router.push('/');
@@ -1603,6 +1752,12 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           <span className="font-bold text-xs sm:text-sm tracking-wide truncate max-w-[130px] sm:max-w-none">
             {noteId ? 'Edit Operative Note' : 'Create Operative Note'}
           </span>
+          {lastSavedTime && (
+            <span className="hidden md:inline-flex items-center text-[10px] text-blue-200 font-normal bg-blue-900/60 px-2 py-0.5 rounded-full border border-blue-600/50 shrink-0">
+              <CheckCircle2 className="h-3 w-3 text-emerald-400 mr-1" />
+              ร่างในเครื่อง {lastSavedTime}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
@@ -1636,6 +1791,33 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           </button>
         </div>
       </header>
+
+      {/* Draft Notification Banner */}
+      {showDraftBanner && existingDraft && (
+        <div className="bg-amber-50 border-b border-amber-300 px-3 py-2.5 sm:px-4 no-print flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm text-amber-950 shadow-inner z-40">
+          <div className="flex items-center space-x-2">
+            <Clock className="h-4 w-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>พบข้อมูลร่างในเครื่อง:</strong> มีข้อมูลร่างที่คุณเคยกรอกไว้เมื่อ <strong>{existingDraft.savedAt}</strong> ต้องการกู้คืนข้อมูลร่างหรือไม่?
+            </span>
+          </div>
+          <div className="flex items-center space-x-2 shrink-0 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={handleRestoreDraft}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-3 py-1 rounded-md shadow-sm flex items-center space-x-1 cursor-pointer transition text-xs">
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>โหลดข้อมูลร่าง</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleDiscardDraft}
+              className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium px-2.5 py-1 rounded-md cursor-pointer transition text-xs">
+              ยกเลิก/ลบร่าง
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Mobile-Native tab switcher (Hidden when printing) */}
       <div className="bg-white border-b border-gray-200 flex no-print sticky top-[45px] sm:top-[48px] z-40 shadow-sm text-xs font-bold w-full overflow-x-auto scrollbar-hide">
@@ -1938,32 +2120,19 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1">Clinical Diagnosis (การวินิจฉัยก่อนผ่าตัด)</label>
-                    <input 
-                      type="text" 
-                      list="diagnosis-options"
+                    <TextareaAutosizeWithAutocomplete 
                       value={formData.clinicalDiagnosis} 
-                      onChange={e => {
-                        const val = e.target.value;
+                      onChangeValue={val => {
                         setFormData(prev => ({
                           ...prev, 
                           clinicalDiagnosis: val,
                           ...(isSameDiagnosis ? { postOpDiagnosis: val } : {})
                         }));
                       }} 
-                      className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      options={DIAGNOSIS_OPTIONS}
+                      placeholder="ระบุการวินิจฉัยก่อนผ่าตัด..."
+                      className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 leading-normal"
                     />
-                    <datalist id="diagnosis-options">
-                      <option value="Hepatocellular carcinoma" />
-                      <option value="Mass-forming cholangiocarcinoma" />
-                      <option value="Perihilar cholangiocarcinoma" />
-                      <option value="Distal common bile duct cholangiocarcinoma" />
-                      <option value="Pancreatic head cancer" />
-                      <option value="Gall bladder cancer" />
-                      <option value="Intraductal papillary neoplasm of bile duct" />
-                      <option value="Intraductal papillary mucinous neoplasm" />
-                      <option value="Mucinous neoplasm" />
-                      <option value="Distal pancreatic cancer" />
-                    </datalist>
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
@@ -1984,15 +2153,15 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                         <span>Same as Pre-op</span>
                       </label>
                     </div>
-                    <input 
-                      type="text" 
-                      list="diagnosis-options"
+                    <TextareaAutosizeWithAutocomplete 
                       value={formData.postOpDiagnosis} 
-                      onChange={e => {
-                        setFormData({...formData, postOpDiagnosis: e.target.value});
+                      onChangeValue={val => {
+                        setFormData({...formData, postOpDiagnosis: val});
                         if (isSameDiagnosis) setIsSameDiagnosis(false);
                       }} 
-                      className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      options={DIAGNOSIS_OPTIONS}
+                      placeholder="ระบุการวินิจฉัยหลังผ่าตัด..."
+                      className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 leading-normal"
                     />
                   </div>
                 </div>
@@ -2061,11 +2230,11 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Operative Procedure Name</label>
-                  <input 
-                    type="text" 
+                  <TextareaAutosize 
                     value={formData.operativeProcedure} 
                     onChange={e => setFormData({...formData, operativeProcedure: e.target.value})} 
-                    className="w-full border rounded-lg p-2.5 text-sm font-semibold text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="ระบุชื่อการผ่าตัด..."
+                    className="w-full border rounded-lg p-2.5 text-sm font-semibold text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-normal"
                   />
                   <div className="mt-2 flex flex-wrap gap-1.5 items-center">
                     <span className="text-[11px] font-medium text-gray-400 mr-1">Quick Add:</span>
@@ -3526,15 +3695,15 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
                 <div className="flex">
                   <div className="shrink-0">Clinical diagnosis:</div>
-                  <div className="grow ml-1 dot-line font-bold">{formData.clinicalDiagnosis}</div>
+                  <div className="grow ml-1 dot-line font-bold whitespace-pre-wrap break-words">{formData.clinicalDiagnosis}</div>
                 </div>
                 <div className="flex">
                   <div className="shrink-0">Post-operative diagnosis:</div>
-                  <div className="grow ml-1 dot-line font-bold">{formData.postOpDiagnosis}</div>
+                  <div className="grow ml-1 dot-line font-bold whitespace-pre-wrap break-words">{formData.postOpDiagnosis}</div>
                 </div>
                 <div className="flex">
                   <div className="shrink-0">Operative Procedure:</div>
-                  <div className="grow ml-1 dot-line font-bold">{formData.operativeProcedure}</div>
+                  <div className="grow ml-1 dot-line font-bold whitespace-pre-wrap break-words">{formData.operativeProcedure}</div>
                 </div>
 
                 <div className="grid grid-cols-12 gap-1">
