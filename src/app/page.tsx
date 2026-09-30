@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { 
@@ -14,7 +14,12 @@ import {
   Calendar, 
   User, 
   Clock, 
-  Filter
+  Filter,
+  Activity,
+  Award,
+  Layers,
+  CheckCircle2,
+  X
 } from 'lucide-react';
 
 interface OperativeNote {
@@ -40,6 +45,16 @@ const OP_LABEL_MAP: Record<string, string> = {
   ramps: 'Distal Pancreatosplenectomy with RAMPS',
 };
 
+const SHORT_OP_LABEL_MAP: Record<string, string> = {
+  lap_chole: 'LC (Lap Chole)',
+  open_hepatectomy: 'Open Hepatectomy',
+  whipple: 'Whipple Operation',
+  lap_hepatectomy: 'Lap Hepatectomy',
+  open_hilar_hepatectomy: 'Open Hilar Hepatectomy',
+  lap_lar: 'Lap LAR',
+  ramps: 'RAMPS',
+};
+
 export default function Dashboard() {
   const [notes, setNotes] = useState<OperativeNote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +69,7 @@ export default function Dashboard() {
       const { data, error } = await supabase
         .from('operative_notes')
         .select('id, created_at, op_date, surgeon, operative_procedure, patient_name, hn, an, op_type, ebl')
+        .order('created_at', { ascending: false })
         .order('op_date', { ascending: false });
 
       if (error) throw error;
@@ -90,6 +106,39 @@ export default function Dashboard() {
     const tpl = userTemplates.find(t => t.id === opType);
     return tpl ? tpl.name : opType;
   };
+
+  const getOpShortLabel = (opType: string) => {
+    if (SHORT_OP_LABEL_MAP[opType]) return SHORT_OP_LABEL_MAP[opType];
+    if (OP_LABEL_MAP[opType]) return OP_LABEL_MAP[opType];
+    const tpl = userTemplates.find(t => t.id === opType);
+    return tpl ? tpl.name : opType;
+  };
+
+  // Calculate operation counts for summary cards
+  const opStats = useMemo(() => {
+    const counts: Record<string, number> = {};
+    notes.forEach(note => {
+      const type = note.op_type || 'other';
+      counts[type] = (counts[type] || 0) + 1;
+    });
+
+    const sorted = Object.entries(counts)
+      .map(([opType, count]) => ({
+        opType,
+        label: getOpShortLabel(opType),
+        fullLabel: getOpLabel(opType),
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // Pick top 4-5 operations
+    const topOps = sorted.slice(0, 5);
+
+    return {
+      total: notes.length,
+      topOps,
+    };
+  }, [notes, userTemplates]);
 
   const handleDelete = async (id: string) => {
     const password = prompt('กรุณากรอกรหัสผ่านเพื่อลบข้อมูล:');
@@ -150,6 +199,94 @@ export default function Dashboard() {
       {/* Main Dashboard Body */}
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-6">
         
+        {/* Operation Summary Cards Section */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center space-x-1.5">
+              <Activity className="h-4 w-4 text-blue-600" />
+              <span>สรุปจำนวน Operation ที่บันทึก (Frequent Procedures)</span>
+            </h2>
+            {selectedOpType !== 'all' && (
+              <button
+                onClick={() => setSelectedOpType('all')}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center space-x-1 bg-blue-50 px-2 py-1 rounded-md transition">
+                <X className="h-3 w-3" />
+                <span>ล้างตัวกรอง ({getOpShortLabel(selectedOpType)})</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* Card 0: Total Cases */}
+            <button
+              onClick={() => setSelectedOpType('all')}
+              className={`p-3.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                selectedOpType === 'all'
+                  ? 'bg-blue-900 text-white border-blue-900 shadow-md ring-2 ring-blue-400'
+                  : 'bg-white text-gray-800 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 shadow-xs'
+              }`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className={`text-[11px] font-semibold uppercase tracking-wide ${selectedOpType === 'all' ? 'text-blue-200' : 'text-gray-500'}`}>
+                  เคสทั้งหมด
+                </span>
+                <Layers className={`h-4 w-4 ${selectedOpType === 'all' ? 'text-yellow-300' : 'text-blue-600'}`} />
+              </div>
+              <div>
+                <span className="text-2xl font-black">{opStats.total}</span>
+                <span className={`text-xs ml-1 font-medium ${selectedOpType === 'all' ? 'text-blue-200' : 'text-gray-500'}`}>cases</span>
+              </div>
+            </button>
+
+            {/* Top 5 Operation Cards */}
+            {opStats.topOps.map((op, idx) => {
+              const isSelected = selectedOpType === op.opType;
+              const cardColors = [
+                'hover:border-emerald-300 text-emerald-700 bg-emerald-50 border-emerald-200',
+                'hover:border-amber-300 text-amber-700 bg-amber-50 border-amber-200',
+                'hover:border-indigo-300 text-indigo-700 bg-indigo-50 border-indigo-200',
+                'hover:border-purple-300 text-purple-700 bg-purple-50 border-purple-200',
+                'hover:border-teal-300 text-teal-700 bg-teal-50 border-teal-200',
+              ];
+              const activeBg = 'bg-blue-700 text-white border-blue-700 shadow-md ring-2 ring-blue-400';
+              const colorClass = cardColors[idx % cardColors.length];
+
+              return (
+                <button
+                  key={op.opType}
+                  onClick={() => setSelectedOpType(isSelected ? 'all' : op.opType)}
+                  title={`คลิกเพื่อกรองเคส ${op.fullLabel}`}
+                  className={`p-3.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                    isSelected
+                      ? activeBg
+                      : `bg-white text-gray-800 border-gray-200 hover:bg-gray-50 shadow-xs`
+                  }`}>
+                  <div className="flex items-start justify-between gap-1 mb-2">
+                    <span 
+                      className={`text-xs font-bold leading-tight line-clamp-2 ${isSelected ? 'text-white' : 'text-gray-800'}`}>
+                      {op.label}
+                    </span>
+                    {isSelected ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-yellow-300 shrink-0" />
+                    ) : (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${colorClass} shrink-0`}>
+                        #{idx + 1}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <span className={`text-2xl font-black ${isSelected ? 'text-white' : 'text-blue-900'}`}>
+                      {op.count}
+                    </span>
+                    <span className={`text-xs ml-1 font-medium ${isSelected ? 'text-blue-100' : 'text-gray-500'}`}>
+                      cases
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Filters Box */}
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
           {/* Search bar */}

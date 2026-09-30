@@ -104,7 +104,8 @@ const SURGEON_PRESETS = [
   'ไชยวัฒน์',
   'นิติเทพ',
   'พรชัย',
-  'สุรชัย'
+  'สุรชัย',
+  'ธนกฤต'
 ];
 
 export default function StaplerFormModal({

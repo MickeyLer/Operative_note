@@ -189,14 +189,17 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
     procedures: [
       "<An infraumbilical/A supraumbilical/An umbilical> incision was made, and pneumoperitoneum was established at 12 mmHg.",
       "The gallbladder was retracted superiorly over the liver.",
+      "A <total/subtotal> cholecystectomy was performed via <antegrade/fundus-down> dissection.",
       "Dissection of Calot's triangle was performed to achieve the Critical View of Safety (CVS).",
       "The cystic duct and cystic artery were clearly identified.",
       "The cystic duct was clipped with <Hem-o-lok clips/titanium clips> (2 clips distally, 1 clip proximally) and divided.",
       "The cystic artery was clipped with <Hem-o-lok clips/titanium clips> and divided.",
       "The gallbladder was dissected off the liver bed using <an electrocautery hook/Harmonic scalpel>.",
+      "[ ] The gallbladder remnant was closed using <V-Loc 3-0/stapler/Endoloop>.",
       "Hemostasis of the gallbladder fossa was verified.",
+      "[ ] A JP drain was placed in the subhepatic space.",
       "The gallbladder was extracted <in an extraction bag (Endo-bag)/without an extraction bag> via the umbilical port.",
-      "The abdomen was deflated, and the port sites were closed using <Nylon/4-0 Monocryl/4-0 Vicryl/Steri-Strips>."
+      "The abdomen was deflated, and the port sites were closed using <3-0 Nylon/Nylon/4-0 Monocryl/4-0 Vicryl/Steri-Strips>."
     ]
   },
   ramps: {
@@ -218,14 +221,14 @@ const OPERATION_PRESETS: Record<OpKey, OperationPreset> = {
       "The inferior border of the pancreas was mobilized, and the superior mesenteric vein (SMV) was identified.",
       "Anterior dissection of the celiac trunk and superior mesenteric artery (SMA) was performed to achieve complete lymphadenectomy (Groups 8, 9, 11, 14, and 18).",
       "The splenic artery was isolated and ligated at its origin from the celiac axis.",
-      "A tunnel was created posterior to the pancreatic neck, and the pancreatic neck was divided using a linear stapler.",
-      "The splenic vein was identified at the junction with the SMV, and was divided and suture-ligated/stapled.",
+      "A tunnel was created posterior to the pancreatic neck, and the pancreatic neck was divided using <a linear stapler/Hand-sewn / Suture Closure/Combined Stapler and Suture>.",
+      "The splenic vein was identified at the junction with the SMV, and was divided and <suture-ligated/stapled>.",
       "Retroperitoneal dissection was performed in an antegrade (right-to-left) fashion.",
-      "The plane of posterior dissection was determined: [Anterior RAMPS - anterior to Gerota's fascia / Posterior RAMPS - posterior to Gerota's fascia, including the left adrenal gland].",
+      "The plane of posterior dissection was determined: <Anterior RAMPS - anterior to Gerota's fascia/Posterior RAMPS - posterior to Gerota's fascia, including the left adrenal gland>.",
       "The dissection was carried laterally to the left renal vein, which was identified and preserved.",
       "The specimen, consisting of the distal pancreas, spleen, and regional lymph nodes, was removed en bloc.",
       "Hemostasis was verified and secured.",
-      "A JP drain was placed in the left subdiaphragmatic space / pancreatic bed.",
+      "A JP drain was placed in the left subdiaphragmatic space and pancreatic bed.",
       "The abdomen was closed in layers using a <Vicryl/PDS loop/Prolene/Monocryl> suture, and the skin was approximated with <staples/nylon>."
     ]
   }
@@ -351,6 +354,194 @@ const TextareaAutosizeWithAutocomplete = ({
               {opt}
             </button>
           ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const formatThaiDate = (dateStr?: string | null): string => {
+  if (!dateStr) return '';
+  const trimmed = dateStr.trim();
+  if (!trimmed) return '';
+
+  // ISO format YYYY-MM-DD (e.g. 2026-09-30)
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    const [, yyyy, mm, dd] = isoMatch;
+    let year = parseInt(yyyy, 10);
+    if (year < 2400) {
+      year += 543;
+    }
+    const day = dd.padStart(2, '0');
+    const month = mm.padStart(2, '0');
+    return `${day}/${month}/${year}`;
+  }
+
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmyMatch) {
+    const [, dd, mm, yyyy] = dmyMatch;
+    let year = parseInt(yyyy, 10);
+    if (year < 2400) {
+      year += 543;
+    }
+    const day = dd.padStart(2, '0');
+    const month = mm.padStart(2, '0');
+    return `${day}/${month}/${year}`;
+  }
+
+  return trimmed;
+};
+
+export const formatTo24Hour = (timeStr?: string | null): string => {
+  if (!timeStr) return '';
+  const trimmed = timeStr.trim();
+  if (!trimmed) return '';
+
+  // 12-hour AM/PM format (e.g. 02:30 PM, 2:30pm, 12:15 AM)
+  const ampmMatch = trimmed.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM|am|pm)$/i);
+  if (ampmMatch) {
+    let hours = parseInt(ampmMatch[1], 10);
+    const minutes = ampmMatch[2];
+    const period = ampmMatch[3].toUpperCase();
+    if (period === 'PM' && hours < 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    return `${hours.toString().padStart(2, '0')}:${minutes}`;
+  }
+
+  // Standard HH:mm or H:mm
+  const standardMatch = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (standardMatch) {
+    const hours = parseInt(standardMatch[1], 10);
+    const minutes = standardMatch[2];
+    if (hours >= 0 && hours <= 23 && parseInt(minutes, 10) < 60) {
+      return `${hours.toString().padStart(2, '0')}:${minutes}`;
+    }
+  }
+
+  // Raw digits (e.g. 830 -> 08:30, 1430 -> 14:30)
+  const rawNumMatch = trimmed.match(/^(\d{3,4})$/);
+  if (rawNumMatch) {
+    const padded = rawNumMatch[1].padStart(4, '0');
+    const hours = parseInt(padded.substring(0, 2), 10);
+    const minutes = padded.substring(2, 4);
+    if (hours >= 0 && hours <= 23 && parseInt(minutes, 10) < 60) {
+      return `${hours.toString().padStart(2, '0')}:${minutes}`;
+    }
+  }
+
+  // Single or double digit hour (e.g. 8 -> 08:00, 14 -> 14:00)
+  const singleHourMatch = trimmed.match(/^(\d{1,2})$/);
+  if (singleHourMatch) {
+    const hours = parseInt(singleHourMatch[1], 10);
+    if (hours >= 0 && hours <= 23) {
+      return `${hours.toString().padStart(2, '0')}:00`;
+    }
+  }
+
+  return trimmed;
+};
+
+const COMMON_SURGERY_TIMES = [
+  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+  '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30',
+  '16:00', '16:30', '17:00', '18:00', '19:00', '20:00'
+];
+
+interface Time24InputProps {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+}
+
+const Time24Input = ({ label, value, onChange }: Time24InputProps) => {
+  const [inputValue, setInputValue] = useState(value || '');
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setInputValue(formatTo24Hour(value));
+  }, [value]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleBlur = () => {
+    const formatted = formatTo24Hour(inputValue);
+    setInputValue(formatted);
+    onChange(formatted);
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInputValue(val);
+    if (/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/.test(val)) {
+      onChange(val);
+    }
+  };
+
+  const handleSelectPreset = (time: string) => {
+    setInputValue(time);
+    onChange(time);
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="block text-xs font-semibold text-gray-500 mb-1">{label} (24 ชม.)</label>
+      <div className="relative flex items-center">
+        <input 
+          type="text"
+          inputMode="numeric"
+          placeholder="HH:mm (เช่น 08:30, 14:15)"
+          value={inputValue}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          onFocus={() => setIsOpen(true)}
+          className="w-full border rounded-lg p-2 pr-8 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-medium"
+        />
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="absolute right-2 text-gray-400 hover:text-blue-600 transition p-1"
+          title="เลือกเวลา (24 ชม.)"
+        >
+          <Clock className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-40 p-2 max-h-48 overflow-y-auto">
+          <div className="text-[10px] font-semibold text-gray-400 mb-1.5 px-1 uppercase tracking-wider">
+            เลือกเวลามาตรฐาน (24hr)
+          </div>
+          <div className="grid grid-cols-4 gap-1">
+            {COMMON_SURGERY_TIMES.map((time) => (
+              <button
+                key={time}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSelectPreset(time);
+                }}
+                className={`py-1 text-xs font-mono rounded transition text-center ${
+                  inputValue === time 
+                    ? 'bg-blue-600 text-white font-bold' 
+                    : 'bg-gray-50 hover:bg-blue-50 text-gray-700 hover:text-blue-700'
+                }`}
+              >
+                {time}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -512,7 +703,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     hn: "",
     an: "",
     ward: "",
-    department: "",
+    department: "ศัลยกรรม",
     
     // Storage Photo URLs
     photos: [] as string[],
@@ -675,11 +866,21 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
     if (presetProcedures.length > 0) {
       setChecklist(presetProcedures.map((proc, idx) => {
+        let isChecked = true;
+        let textToParse = proc;
+        if (textToParse.startsWith('[ ] ')) {
+          isChecked = false;
+          textToParse = textToParse.substring(4);
+        } else if (textToParse.startsWith('[x] ')) {
+          isChecked = true;
+          textToParse = textToParse.substring(4);
+        }
+
         const regex = /<([^>]+)>/g;
         const selections: Record<number, string[]> = {};
         let phIndex = 0;
         
-        const newText = proc.replace(regex, (match, content) => {
+        const newText = textToParse.replace(regex, (match, content) => {
           const options = content.split(/[\/|]/).map((o: string) => o.trim());
           const defaultOpt = options[0]; // Set first option as default
           selections[phIndex] = [defaultOpt];
@@ -690,8 +891,8 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
         return {
           id: idx,
           text: newText,
-          templateText: proc,
-          checked: true,
+          templateText: textToParse,
+          checked: isChecked,
           selections: selections
         };
       }));
@@ -723,6 +924,8 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     };
   }, [isDirty]);
 
+  const initialSnapshotRef = useRef<string | null>(null);
+
   const handleBackToDashboard = () => {
     if (isDirty) {
       setConfirmNavDest('/');
@@ -730,6 +933,14 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       router.push('/');
     }
   };
+
+  // Set initial snapshot once form finishes initializing
+  useEffect(() => {
+    if (isFormInitialized && !loading && initialSnapshotRef.current === null) {
+      initialSnapshotRef.current = JSON.stringify({ selectedOpKey, formData, checklist });
+      setIsDirty(false);
+    }
+  }, [isFormInitialized, loading, selectedOpKey, formData, checklist]);
 
   // Fetch note & templates on load
   useEffect(() => {
@@ -758,8 +969,8 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           
           setFormData({
             opDate: data.op_date,
-            timeStarted: data.time_started,
-            timeEnded: data.time_ended,
+            timeStarted: formatTo24Hour(data.time_started),
+            timeEnded: formatTo24Hour(data.time_ended),
             surgeon: data.surgeon,
             firstAssistant: data.first_assistant,
             secondAssistant: data.second_assistant || '',
@@ -818,7 +1029,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
             hn: data.hn,
             an: data.an,
             ward: data.ward,
-            department: data.department,
+            department: data.department || 'ศัลยกรรม',
             
             // Photos
             photos: data.photos || [],
@@ -883,22 +1094,28 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
     showToast('ลบข้อมูลร่างเรียบร้อยแล้ว', 'info');
   };
 
-  // Auto-save draft effect (debounced 500ms)
+  // Auto-save draft effect (debounced 500ms) & Dirty State Detection
   useEffect(() => {
-    if (!isFormInitialized || loading) return;
+    if (!isFormInitialized || loading || initialSnapshotRef.current === null) return;
 
-    const timer = setTimeout(() => {
-      saveDraft({
-        selectedOpKey,
-        formData,
-        checklist,
-        activeTab
-      });
-      setIsDirty(true);
-    }, 500);
+    const currentSnapshot = JSON.stringify({ selectedOpKey, formData, checklist });
+    const hasChanged = currentSnapshot !== initialSnapshotRef.current;
 
-    return () => clearTimeout(timer);
-  }, [formData, checklist, selectedOpKey, activeTab, isFormInitialized, loading, saveDraft]);
+    setIsDirty(hasChanged);
+
+    if (hasChanged) {
+      const timer = setTimeout(() => {
+        saveDraft({
+          selectedOpKey,
+          formData,
+          checklist,
+          activeTab
+        });
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [formData, checklist, selectedOpKey, isFormInitialized, loading, saveDraft, activeTab]);
 
 
   // Switch Operation type & sync default details
@@ -1247,8 +1464,8 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       ...prev,
       {
         id: prev.length > 0 ? Math.max(...prev.map(i => i.id)) + 1 : 0,
-        text: "New surgical step...",
-        templateText: "New surgical step...",
+        text: "",
+        templateText: "",
         checked: true,
         selections: {}
       }
@@ -1577,7 +1794,10 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
         // Edit mode / Update existing
         const { error } = await supabase
           .from('operative_notes')
-          .update(payload)
+          .update({
+            ...payload,
+            created_at: new Date().toISOString()
+          })
           .eq('id', activeId);
 
         if (error) throw error;
@@ -1601,6 +1821,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
         }
       }
 
+      initialSnapshotRef.current = JSON.stringify({ selectedOpKey, formData, checklist });
       setIsDirty(false);
       clearDraft();
       setShowDraftBanner(false);
@@ -1765,15 +1986,15 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
             <button 
               onClick={handleDownloadPDF} 
               disabled={saving || generatingPdf}
-              title={generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง pdf file'}
-              aria-label={generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง pdf file'}
-              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg shadow flex items-center space-x-1 transition cursor-pointer">
+              title={generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง PDF'}
+              aria-label={generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง PDF'}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white text-xs sm:text-sm font-bold px-3 sm:px-4 py-1.5 rounded-lg shadow flex items-center space-x-1.5 transition cursor-pointer">
               {generatingPdf ? (
                 <Loader2 className="h-4 w-4 animate-spin shrink-0" />
               ) : (
                 <FileText className="h-4 w-4 shrink-0" />
               )}
-              <span className="hidden sm:inline">{generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง pdf file'}</span>
+              <span>{generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง PDF'}</span>
             </button>
           )}
           <button 
@@ -1864,10 +2085,10 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
         <button 
           className={`mobile-tab-btn flex-none min-w-[72px] sm:min-w-[120px] py-2 sm:py-2.5 px-2 flex flex-col md:flex-row items-center justify-center space-x-0 md:space-x-1.5 transition ${activeTab === 'preview' ? 'active' : 'text-gray-600'}`}
           onClick={() => handleTabClick('preview')}
-          title="5. A4 Print Preview">
+          title="5. พรีวิวและสร้าง PDF">
           <Printer className="h-5 w-5 shrink-0" />
-          <span className="hidden md:inline">5. A4 Print Preview</span>
-          <span className="text-[10px] font-semibold block md:hidden leading-none mt-1 truncate">Preview</span>
+          <span className="hidden md:inline">5. พรีวิว & สร้าง PDF</span>
+          <span className="text-[10px] font-semibold block md:hidden leading-none mt-1 truncate">สร้าง PDF</span>
         </button>
       </div>
 
@@ -2023,24 +2244,16 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                       className="w-full border rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Start Time</label>
-                    <input 
-                      type="time" 
-                      value={formData.timeStarted} 
-                      onChange={e => setFormData({...formData, timeStarted: e.target.value})} 
-                      className="w-full border rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">End Time</label>
-                    <input 
-                      type="time" 
-                      value={formData.timeEnded} 
-                      onChange={e => setFormData({...formData, timeEnded: e.target.value})} 
-                      className="w-full border rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
+                  <Time24Input 
+                    label="Start Time" 
+                    value={formData.timeStarted} 
+                    onChange={val => setFormData(prev => ({...prev, timeStarted: val}))} 
+                  />
+                  <Time24Input 
+                    label="End Time" 
+                    value={formData.timeEnded} 
+                    onChange={val => setFormData(prev => ({...prev, timeEnded: val}))} 
+                  />
                 </div>
 
                 <div className="space-y-3">
@@ -2061,6 +2274,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                       <option value="นิติเทพ" />
                       <option value="พรชัย" />
                       <option value="สุรชัย" />
+                      <option value="ธนกฤต" />
                     </datalist>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -2068,6 +2282,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                       <label className="block text-xs font-semibold text-gray-500 mb-1">First Assistant (ผู้ช่วยคนที่ 1)</label>
                       <input 
                         type="text" 
+                        list="surgeon-options"
                         value={formData.firstAssistant} 
                         onChange={e => setFormData({...formData, firstAssistant: e.target.value})} 
                         className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2077,6 +2292,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                       <label className="block text-xs font-semibold text-gray-500 mb-1">Second Assistant (ผู้ช่วยคนที่ 2)</label>
                       <input 
                         type="text" 
+                        list="surgeon-options"
                         value={formData.secondAssistant} 
                         onChange={e => setFormData({...formData, secondAssistant: e.target.value})} 
                         className="w-full border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2378,7 +2594,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                               <TextareaAutosize
                                 value={item.text}
                                 onChange={(e) => handleTextChange(item.id, e.target.value)}
-                                placeholder="Describe the surgical step..."
+                                placeholder="ระบุขั้นตอนผ่าตัด... (New surgical step...)"
                                 className={`no-toggle w-full bg-transparent border-0 border-b border-dashed border-gray-205 hover:border-gray-400 focus:border-blue-500 focus:ring-0 p-1 text-xs focus:bg-blue-50/30 rounded transition leading-relaxed min-h-[1.75rem] break-words break-all whitespace-pre-wrap ${
                                   item.checked ? 'text-gray-900 font-medium' : 'text-gray-400 line-through'
                                 }`}
@@ -3567,8 +3783,8 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                 </button>
                 <button 
                   onClick={() => handleTabClick('preview')}
-                  className="bg-blue-600 text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow hover:bg-blue-700 transition w-full sm:w-auto">
-                  <span>Next: Preview A4 Page</span>
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center space-x-2 text-sm shadow transition w-full sm:w-auto cursor-pointer">
+                  <span>ถัดไป: พรีวิว & สร้าง PDF</span>
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
@@ -3609,13 +3825,13 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                 <div className="flex items-center space-x-2 flex-wrap gap-2">
                   <button 
                     onClick={() => handleTabClick('summary')}
-                    className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-semibold px-3 py-2 rounded-lg flex items-center space-x-1.5 shadow-sm transition">
+                    className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-semibold px-3 py-2 rounded-lg flex items-center space-x-1.5 shadow-sm transition cursor-pointer">
                     <ChevronLeft className="h-3.5 w-3.5" />
                     <span>Back to Edit Form</span>
                   </button>
                   <button 
                     onClick={() => setIsZoomed(!isZoomed)}
-                    className="max-[820px]:inline-flex hidden text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-2 rounded-lg items-center space-x-1.5 shadow-sm transition"
+                    className="max-[820px]:inline-flex hidden text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-2 rounded-lg items-center space-x-1.5 shadow-sm transition cursor-pointer"
                   >
                     {isZoomed ? (
                       <>
@@ -3630,9 +3846,23 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                     )}
                   </button>
                 </div>
-                <div className="flex items-center space-x-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg shadow-sm">
-                  <Check className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span>ระบบจะบันทึกข้อมูลให้อัตโนมัติเมื่อกดสร้าง PDF</span>
+                <div className="flex items-center space-x-3 flex-wrap gap-2">
+                  <button 
+                    onClick={handleDownloadPDF} 
+                    disabled={saving || generatingPdf}
+                    className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white font-bold px-4 py-2 rounded-lg text-xs sm:text-sm shadow flex items-center space-x-2 transition cursor-pointer"
+                  >
+                    {generatingPdf ? (
+                      <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                    ) : (
+                      <FileText className="h-4 w-4 shrink-0" />
+                    )}
+                    <span>{generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง PDF'}</span>
+                  </button>
+                  <div className="hidden lg:flex items-center space-x-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg shadow-sm">
+                    <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>ระบบบันทึกให้อัตโนมัติเมื่อกดสร้าง PDF</span>
+                  </div>
                 </div>
               </div>
 
@@ -3673,9 +3903,9 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
               {/* Meta Header Lines */}
               <div className="space-y-1 mb-2 text-[13.5px] a4-meta-header">
                 <div className="flex justify-between">
-                  <div>Date of operative: <span className="dot-line min-w-[120px]">{formData.opDate}</span></div>
-                  <div>Time started: <span className="dot-line min-w-[70px]">{formData.timeStarted}</span></div>
-                  <div>Time ended: <span className="dot-line min-w-[70px]">{formData.timeEnded}</span></div>
+                  <div>Date of operative: <span className="dot-line min-w-[120px]">{formatThaiDate(formData.opDate)}</span></div>
+                  <div>Time started: <span className="dot-line min-w-[70px]">{formatTo24Hour(formData.timeStarted)}</span></div>
+                  <div>Time ended: <span className="dot-line min-w-[70px]">{formatTo24Hour(formData.timeEnded)}</span></div>
                 </div>
                 
                 <div className="grid grid-cols-12 gap-1">
@@ -3975,7 +4205,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
                 {/* Right Column - Procedure Steps (7 cols) */}
                 <div className="col-span-7 pl-1.5 text-xs space-y-1.5 a4-steps-col">
                   <div className="font-bold border-b pb-0.5 border-black">Procedure Steps Completed:</div>
-                  {checklist.filter(item => item.checked).map((item, idx) => (
+                  {checklist.filter(item => item.checked && item.text.trim() !== '').map((item, idx) => (
                     <div key={idx} className="flex items-start space-x-2 text-[12px] leading-tight">
                       <span className="font-bold shrink-0">{idx + 1}.</span>
                       <span>{item.text}</span>
@@ -4032,6 +4262,29 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
 
               </div>
             </div>
+          </div>
+
+          {/* Bottom Action Bar for Preview Tab */}
+          <div className="no-print mt-6 mb-4 flex flex-col sm:flex-row justify-between items-center bg-white border border-gray-200 p-4 rounded-xl shadow-sm gap-3">
+            <button 
+              onClick={() => handleTabClick('summary')}
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-4 py-2.5 rounded-xl text-sm transition flex items-center space-x-2 w-full sm:w-auto justify-center cursor-pointer"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span>ย้อนกลับไปแก้ไขข้อมูล</span>
+            </button>
+            <button 
+              onClick={handleDownloadPDF}
+              disabled={saving || generatingPdf}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white font-bold px-6 py-2.5 rounded-xl text-sm shadow-md transition flex items-center space-x-2 w-full sm:w-auto justify-center cursor-pointer"
+            >
+              {generatingPdf ? (
+                <Loader2 className="h-5 w-5 animate-spin shrink-0" />
+              ) : (
+                <FileText className="h-5 w-5 shrink-0" />
+              )}
+              <span>{generatingPdf ? 'กำลังสร้าง PDF...' : 'สร้าง PDF'}</span>
+            </button>
           </div>
         </div>
         </>
@@ -4192,6 +4445,77 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           totalCount={cropQueue.length}
           onSkip={cropQueue.length > 1 ? handleCropSkip : undefined}
         />
+      )}
+
+      {/* Unsaved Changes / Navigation Confirmation Modal */}
+      {confirmNavDest && (
+        <div className="fixed inset-0 bg-black/55 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="bg-blue-800 text-white px-5 py-4 flex justify-between items-center">
+              <h3 className="font-bold text-base flex items-center space-x-2">
+                <Info className="h-5 w-5 text-yellow-300 shrink-0" />
+                <span>ต้องการบันทึกข้อมูลหรือไม่?</span>
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setConfirmNavDest(null)}
+                className="text-white/80 hover:text-white transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5 text-sm text-gray-700 space-y-2">
+              <p className="font-semibold text-gray-900">
+                คุณมีข้อมูลที่กำลังทำอยู่และยังไม่ได้บันทึกลงในระบบ
+              </p>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                คุณต้องการบันทึกข้อมูลลงในระบบก่อนย้อนกลับไปหน้า Dashboard หรือไม่?
+              </p>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="bg-gray-50 border-t px-5 py-4 flex flex-col sm:flex-row gap-2 justify-end">
+              <button 
+                type="button" 
+                onClick={() => setConfirmNavDest(null)}
+                className="w-full sm:w-auto bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-medium px-3.5 py-2 rounded-lg text-xs transition cursor-pointer order-3 sm:order-1"
+              >
+                ทำงานต่อ
+              </button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  const dest = confirmNavDest;
+                  setConfirmNavDest(null);
+                  clearDraft();
+                  setIsDirty(false);
+                  router.push(dest);
+                }}
+                className="w-full sm:w-auto bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-semibold px-3.5 py-2 rounded-lg text-xs transition cursor-pointer order-2 sm:order-2"
+              >
+                ไม่บันทึก
+              </button>
+              <button 
+                type="button" 
+                onClick={async () => {
+                  const dest = confirmNavDest;
+                  setConfirmNavDest(null);
+                  const success = await handleSave(false);
+                  if (success) {
+                    router.push(dest);
+                  }
+                }}
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-lg text-xs shadow transition flex items-center justify-center space-x-1 cursor-pointer order-1 sm:order-3"
+              >
+                <Save className="h-3.5 w-3.5 mr-1" />
+                <span>บันทึกและกลับหน้าหลัก</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
