@@ -1,14 +1,9 @@
-// ===== 🔑 Gemini API Keys List =====
-const GEMINI_API_KEYS = [
-  'AIzaSyDNXDVW82LXzmYP5TjOw6U5bqebPv1XR6E',  // lerpongKKH
-  'AIzaSyDZpwXNZI2k5FP3Ym7RU4KSwkIFaoLmISM',  // lerpongKKH
-  'AIzaSyAeUtg_Mz6Xrotzrac8IjrwCGMniJrSY-A',  // lerpongKKH
-  'AIzaSyB5nC2KGSFQx-Jzl9UynvyrmV-egjwQgkU',  // sathaporn
-  'AIzaSyDOWlhMv4CcuxbnBL3O8cX_QfJYMrLrg5w',  // sathaporn
-  'AIzaSyA2tPLxrgFKKyEddHdfaJxvD4dYswDwLIA',  // sathaporn
-  'AIzaSyC2hq5EmxHgsDiGuybZLO211cUxGUXcIzw',  // lerpong1989
-  'AIzaSyDDJmNAEMtm7X50p6LM-UCMS39f34o19Lw',  // lerpong1989
-];
+// ===== 🔑 Gemini API Keys List (Loaded from env) =====
+const rawKeys = process.env.NEXT_PUBLIC_GEMINI_API_KEYS || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+const GEMINI_API_KEYS = rawKeys
+  .split(',')
+  .map((k) => k.trim())
+  .filter(Boolean);
 
 interface KeyStatus {
   index: number;
@@ -42,6 +37,10 @@ class APIKeyManager {
   }
 
   getCurrentKey(): string {
+    if (this.keys.length === 0) {
+      throw new Error('🚫 ไม่พบ Gemini API Key กรุณากำหนด NEXT_PUBLIC_GEMINI_API_KEYS ในไฟล์ .env.local หรือ Vercel Environment Variables');
+    }
+
     for (let i = 0; i < this.keys.length; i++) {
       const actualIndex = (this.currentIndex + i) % this.keys.length;
       const key = this.keys[actualIndex];
