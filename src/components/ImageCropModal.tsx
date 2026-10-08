@@ -12,6 +12,8 @@ interface ImageCropModalProps {
   currentIndex?: number;
   totalCount?: number;
   onSkip?: () => void;
+  title?: string;
+  saveLabel?: string;
 }
 
 const ASPECT_RATIOS = [
@@ -132,6 +134,8 @@ export default function ImageCropModal({
   currentIndex,
   totalCount,
   onSkip,
+  title,
+  saveLabel,
 }: ImageCropModalProps) {
   const [crop, setCrop] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -188,7 +192,7 @@ export default function ImageCropModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-gray-900 text-white">
           <div className="flex items-center space-x-2">
-            <h3 className="font-bold text-base">Crop & Rotate Image (หมุนและตัดรูป)</h3>
+            <h3 className="font-bold text-base">{title || 'Crop & Rotate Image (หมุนและตัดรูป)'}</h3>
             {totalCount && totalCount > 1 && (
               <span className="bg-blue-600 text-white text-xs px-2.5 py-0.5 rounded-full font-medium">
                 {currentIndex} / {totalCount}
@@ -319,7 +323,7 @@ export default function ImageCropModal({
               className="flex items-center space-x-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl shadow-md transition"
             >
               <Check className="w-4 h-4" />
-              <span>{processing ? 'Processing...' : 'Apply & Save (ใช้รูปนี้)'}</span>
+              <span>{processing ? 'Processing...' : (saveLabel || 'Apply & Save (ใช้รูปนี้)')}</span>
             </button>
           </div>
         </div>

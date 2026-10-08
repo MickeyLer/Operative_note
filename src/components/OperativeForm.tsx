@@ -758,19 +758,47 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
   const [stickerScanProgress, setStickerScanProgress] = useState<string>('');
   const [stickerScanSuccess, setStickerScanSuccess] = useState<string | null>(null);
   const [stickerScanError, setStickerScanError] = useState<string | null>(null);
+  const [stickerCropModalOpen, setStickerCropModalOpen] = useState(false);
+  const [stickerCropImageSrc, setStickerCropImageSrc] = useState<string | null>(null);
   const stickerFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleStickerFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStickerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setStickerScanSuccess(null);
+    setStickerScanError(null);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        setStickerCropImageSrc(dataUrl);
+        setStickerCropModalOpen(true);
+      }
+    };
+    reader.readAsDataURL(file);
+
+    if (e.target) {
+      e.target.value = '';
+    }
+  };
+
+  const handleStickerCropClose = () => {
+    setStickerCropModalOpen(false);
+    setStickerCropImageSrc(null);
+  };
+
+  const handleStickerCropSave = async (croppedBlob: Blob) => {
+    setStickerCropModalOpen(false);
     setIsScanningSticker(true);
     setStickerScanProgress('กำลังเตรียมรูปภาพ...');
     setStickerScanSuccess(null);
     setStickerScanError(null);
 
     try {
-      const result = await scanPatientSticker(file, (_progress, message) => {
+      const stickerFile = new File([croppedBlob], `sticker-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const result = await scanPatientSticker(stickerFile, (_progress, message) => {
         setStickerScanProgress(message);
       });
 
@@ -804,9 +832,7 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
       setTimeout(() => setStickerScanError(null), 6000);
     } finally {
       setIsScanningSticker(false);
-      if (e.target) {
-        e.target.value = '';
-      }
+      setStickerCropImageSrc(null);
     }
   };
 
@@ -4444,6 +4470,18 @@ export default function OperativeForm({ noteId, initialPrint = false }: Operativ
           currentIndex={currentCropIndex + 1}
           totalCount={cropQueue.length}
           onSkip={cropQueue.length > 1 ? handleCropSkip : undefined}
+        />
+      )}
+
+      {/* Sticker Image Crop & Rotate Modal */}
+      {stickerCropImageSrc && (
+        <ImageCropModal
+          isOpen={stickerCropModalOpen}
+          imageSrc={stickerCropImageSrc}
+          onClose={handleStickerCropClose}
+          onCropSave={handleStickerCropSave}
+          title="หมุน & ครอบสติ๊กเกอร์ผู้ป่วย (Rotate & Crop Sticker)"
+          saveLabel="สแกนด้วย AI (Scan with AI)"
         />
       )}
 

@@ -239,7 +239,7 @@ export const scanPatientSticker = async (
 
       if (onProgress) onProgress(55, `กำลังส่งข้อมูลให้ AI วิเคราะห์ (Key #${apiKeyManager.getCurrentKeyIndex()})...`);
 
-      const AVAILABLE_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+      const AVAILABLE_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
       const MODEL_NAME = AVAILABLE_MODELS[attempt % AVAILABLE_MODELS.length];
 
       const textPrompt = `วิเคราะห์สติ๊กเกอร์ป้ายชื่อผู้ป่วยประจำโรงพยาบาลในประเทศไทยจากรูปถ่าย และตอบกลับในรูปแบบ JSON เท่านั้น
