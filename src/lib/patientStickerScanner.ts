@@ -239,7 +239,7 @@ export const scanPatientSticker = async (
 
       if (onProgress) onProgress(55, `กำลังส่งข้อมูลให้ AI วิเคราะห์ (Key #${apiKeyManager.getCurrentKeyIndex()})...`);
 
-      const AVAILABLE_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+      const AVAILABLE_MODELS = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.1-flash-lite"];
       const MODEL_NAME = AVAILABLE_MODELS[attempt % AVAILABLE_MODELS.length];
 
       const textPrompt = `วิเคราะห์สติ๊กเกอร์ป้ายชื่อผู้ป่วยประจำโรงพยาบาลในประเทศไทยจากรูปถ่าย และตอบกลับในรูปแบบ JSON เท่านั้น
@@ -297,14 +297,15 @@ export const scanPatientSticker = async (
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const error = new Error(errorData.error?.message || `HTTP ${response.status}`);
+        const errorMsg = errorData.error?.message || `HTTP ${response.status}`;
+        const error = new Error(errorMsg);
         apiKeyManager.reportError(apiKey, error);
         lastError = error;
 
-        if (error.message.includes('429') || error.message.includes('quota')) {
-          continue;
-        }
-        throw error;
+        console.warn(`⚠️ Model ${MODEL_NAME} failed (attempt ${attempt + 1}/${maxRetries}): ${errorMsg}. Trying fallback model...`);
+
+        // Always continue loop to try fallback models/keys on any API error (503 high demand, 429 rate limit, 500, etc.)
+        continue;
       }
 
       const data = await response.json();
